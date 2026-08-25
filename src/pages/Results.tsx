@@ -320,7 +320,7 @@ export default function Results() {
       </main>
 
       <footer className="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-600">
-        © 2025 Browave Corporation · MA2.0 Program · 🇵🇭 Philippines Recruitment
+        © 2025 Browave Corporation · MA4.0 Program · 🇵🇭 Philippines Recruitment
       </footer>
     </div>
   );

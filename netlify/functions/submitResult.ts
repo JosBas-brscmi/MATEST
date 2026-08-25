@@ -292,7 +292,7 @@ function buildFinalEmailHtml(
     <!-- Footer -->
     <div style="background:#020c1f;padding:16px 32px;text-align:center;border-top:1px solid #1e293b;">
       <p style="color:#334155;font-size:10px;margin:0;letter-spacing:1px;">
-        BROWAVE Corporation &nbsp;·&nbsp; MA2.0 Program &nbsp;·&nbsp; Philippines Recruitment
+        BROWAVE Corporation &nbsp;·&nbsp; MA4.0 Program &nbsp;·&nbsp; Philippines Recruitment
       </p>
     </div>
   </div>`;

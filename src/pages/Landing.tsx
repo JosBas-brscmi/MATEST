@@ -131,7 +131,7 @@ export default function Landing() {
             </div>
             <p className="text-slate-400 tracking-widest uppercase"
               style={{ fontSize: '0.68rem', letterSpacing: '0.22em', fontWeight: 600 }}>
-              MA2.0 Talent Assessment &nbsp;·&nbsp; Philippines
+              MA4.0 Talent Assessment &nbsp;·&nbsp; Philippines
             </p>
             <div className="mt-3 inline-block">
               <span className="font-barlow-cond font-bold tracking-wider uppercase px-5 py-1.5
@@ -271,7 +271,7 @@ export default function Landing() {
         </button>
 
         <p className="mt-5 text-center text-slate-600 text-xs tracking-wide">
-          For fresh graduates in the Philippines · MATTA / MA2.0 Recruitment Program
+          For fresh graduates in the Philippines · MATTA / MA4.0 Recruitment Program
         </p>
       </div>
     </div>

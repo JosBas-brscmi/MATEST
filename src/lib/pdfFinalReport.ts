@@ -282,7 +282,7 @@ export async function downloadFinalPdf(bundle: any) {
     sf(pageDoc, C.accent); pageDoc.rect(0, PH - 12, PW, 1.5, 'F');
     st(pageDoc, [100, 140, 190]);
     pageDoc.setFont('helvetica', 'normal'); pageDoc.setFontSize(7);
-    pageDoc.text('BROWAVE Corporation   /   MA2.0 Program   /   Philippines Recruitment', ML, PH - 5);
+    pageDoc.text('BROWAVE Corporation   /   MA4.0 Program   /   Philippines Recruitment', ML, PH - 5);
     pageDoc.text('CONFIDENTIAL — For MA CENTER use only', PW - MR, PH - 5, { align: 'right' });
   };
   drawFooter(doc);
