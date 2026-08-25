@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BROWAVE MATTA CENTER</title>
+    <meta
+      name="description"
+      content="BROWAVE MATTA CENTER assessment portal (IQ, English, Aptitude)"
+    />
+  </head>
+
+  <body class="bg-ink text-white">
+    <div id="root"></div>
+
+    <!-- Netlify Forms: hidden form for MATTA results -->
+    <form
+      name="matta-results"
+      method="POST"
+      data-netlify="true"
+      netlify-honeypot="bot-field"
+      hidden
+    >
+      <input type="hidden" name="form-name" value="matta-results" />
+      <input type="email" name="candidateEmail" />
+      <input type="text" name="testKey" />
+      <input type="number" name="scorePercent" />
+      <textarea name="payloadJson"></textarea>
+    </form>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
