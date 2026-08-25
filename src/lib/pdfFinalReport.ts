@@ -181,21 +181,24 @@ export async function downloadFinalPdf(bundle: any) {
     infoY += 6;
   });
 
-  // Score pill badges — top-right of card
+  // Score pills — top-right of header, below the generated date/time
   const pillData = [
     { lbl: 'IQ',       pct: bundle.iq?.score?.percent      ?? null, col: C.blue   },
     { lbl: 'English',  pct: bundle.english?.score?.percent ?? null, col: C.purple },
     { lbl: 'Aptitude', pct: bundle.aptitude?.score?.percent ?? null, col: C.accent },
   ];
+  const PILL_Y = 34;   // top of the pill row, inside the header band
+  const PILL_H = 15;   // pill height — a touch taller so both text lines breathe
   let px = PW - MR - 3;
   pillData.filter(p => p.pct !== null).reverse().forEach(({ lbl, pct, col }) => {
     const pw = 24;
     px -= pw + 2;
-    sf(doc, col); doc.roundedRect(px, Y + 3, pw, 13, 2, 2, 'F');
-    st(doc, C.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-    doc.text(`${pct}%`, px + pw / 2, Y + 10, { align: 'center' });
-    doc.setFontSize(5.5);
-    doc.text(lbl.toUpperCase(), px + pw / 2, Y + 14, { align: 'center' });
+    sf(doc, col); doc.roundedRect(px, PILL_Y, pw, PILL_H, 2, 2, 'F');
+    st(doc, C.white);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    doc.text(`${pct}%`, px + pw / 2, PILL_Y + 7, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
+    doc.text(lbl.toUpperCase(), px + pw / 2, PILL_Y + 12, { align: 'center' });
   });
 
   Y += 42;
@@ -242,7 +245,7 @@ export async function downloadFinalPdf(bundle: any) {
   //  I. IQ TEST
   // ════════════════════════════════════════
   if (bundle.iq) {
-    Y = section('I. COGNITIVE IQ TEST', '— Intelligence Assessment', C.blue, Y);
+    Y = section('I. COGNITIVE IQ TEST', '                — Intelligence Assessment', C.blue, Y);
     Y = scoreBlock(doc, Y,
       bundle.iq.score?.percent ?? 0,
       bundle.iq.score?.correct ?? 0,
@@ -254,7 +257,7 @@ export async function downloadFinalPdf(bundle: any) {
   //  II. ENGLISH
   // ════════════════════════════════════════
   if (bundle.english) {
-    Y = section('II. ENGLISH PROFICIENCY', '— Language Assessment', C.purple, Y);
+    Y = section('II. ENGLISH PROFICIENCY', '                    — Language Assessment', C.purple, Y);
     Y = scoreBlock(doc, Y,
       bundle.english.score?.percent ?? 0,
       bundle.english.score?.correct ?? 0,
@@ -266,7 +269,7 @@ export async function downloadFinalPdf(bundle: any) {
   //  III. APTITUDE & PERSONALITY
   // ════════════════════════════════════════
   if (bundle.aptitude) {
-    Y = section('III. APTITUDE & PERSONALITY', '— Behavioural Assessment', C.accent, Y);
+    Y = section('III. APTITUDE & PERSONALITY', '                        — Behavioural Assessment', C.accent, Y);
     Y = scoreBlock(doc, Y,
       bundle.aptitude.score?.percent ?? 0,
       bundle.aptitude.score?.correct ?? 0,
