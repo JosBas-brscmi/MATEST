@@ -26,10 +26,6 @@ function load(): ProgressMap {
   } catch { return DEFAULT; }
 }
 
-function save(p: ProgressMap) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
-}
-
 export default function Portal() {
   const nav = useNavigate();
   const [progress, setProgress] = useState<ProgressMap>(() => load());

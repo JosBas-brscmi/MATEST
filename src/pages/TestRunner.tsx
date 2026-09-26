@@ -55,6 +55,7 @@ export default function TestRunner() {
   const [timeLeft, setTimeLeft]   = useState(totalTime);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -68,44 +69,24 @@ export default function TestRunner() {
     async (auto = false) => {
       if (submitted || submitting) return;
       setSubmitting(true);
+      setSubmitError('');
 
       const { correct, total } = scoreSimple(questions, answers);
       const percent            = Math.round((correct / total) * 100);
       const testId             = `${testKey.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const submittedAtISO     = new Date().toISOString();
 
-      // Get candidate info: try sessionStorage first, then fall back to Netlify Identity
+      // Candidate details are collected locally before the assessment starts.
       let candidateInfo: Record<string, string> = {};
       try {
         const raw = sessionStorage.getItem('candidateInfo');
         if (raw) candidateInfo = JSON.parse(raw);
       } catch { /* ignore */ }
 
-      // If no sessionStorage data, use Netlify Identity user info
       if (!candidateInfo.email) {
-        try {
-          const netlifyUser = (window as any).netlifyIdentity?.currentUser?.();
-          if (netlifyUser?.email) {
-            candidateInfo = {
-              email:    netlifyUser.email,
-              fullName: netlifyUser.user_metadata?.full_name || netlifyUser.email.split('@')[0],
-              school:   netlifyUser.user_metadata?.school   || '—',
-              course:   netlifyUser.user_metadata?.course   || '—',
-              phone:    netlifyUser.user_metadata?.phone    || '—',
-            };
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Final fallback: use a placeholder so validation passes
-      if (!candidateInfo.email) {
-        candidateInfo = {
-          email:    'unknown@matta.test',
-          fullName: 'Unknown Candidate',
-          school:   '—',
-          course:   '—',
-          phone:    '—',
-        };
+        setSubmitError('Candidate information is missing. Return to registration and enter your details before submitting.');
+        setSubmitting(false);
+        return;
       }
 
       const resultPayload = {
@@ -127,13 +108,20 @@ export default function TestRunner() {
       } catch { /* ignore */ }
 
       try {
-        await fetch('/.netlify/functions/submitResult', {
+        const response = await fetch('/api/results', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(resultPayload),
         });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || `Submission failed (${response.status}).`);
+        }
       } catch (e) {
         console.error('Submit error:', e);
+        setSubmitError(e instanceof Error ? e.message : 'Could not save your result. Check the local API and retry.');
+        setSubmitting(false);
+        return;
       }
 
       markCompleted(testKey);
@@ -144,6 +132,7 @@ export default function TestRunner() {
   );
 
   useEffect(() => {
+    if (submitted || submitting || submitError) return;
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) { clearInterval(timerRef.current!); submitTest(true); return 0; }
@@ -151,7 +140,7 @@ export default function TestRunner() {
       });
     }, 1000);
     return () => clearInterval(timerRef.current!);
-  }, [submitTest]);
+  }, [submitTest, submitted, submitting, submitError]);
 
   if (questions.length === 0) return null;
 
@@ -427,6 +416,20 @@ export default function TestRunner() {
               >
                 {submitting ? 'Submitting...' : '✓ All Answered — Submit Now'}
               </button>
+            )}
+
+            {submitError && (
+              <div role="alert" className="mt-4 rounded-xl border border-red-700 bg-red-950/60 p-4 text-sm text-red-200">
+                <p>{submitError}</p>
+                <div className="mt-3 flex gap-3">
+                  <button onClick={() => submitTest(timeLeft === 0)} className="rounded-lg bg-red-800 px-4 py-2 font-semibold hover:bg-red-700">
+                    Retry submission
+                  </button>
+                  <button onClick={() => navigate('/')} className="rounded-lg border border-red-700 px-4 py-2 hover:bg-red-900/50">
+                    Return to registration
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </main>

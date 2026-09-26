@@ -1,5 +1,5 @@
 // src/lib/progress.ts
-import type { TestKey } from './index';
+import type { TestKey } from '../lib';
 
 export type ProgressState = 'locked' | 'available' | 'completed';
 export type ProgressMap = Record<TestKey, ProgressState>;

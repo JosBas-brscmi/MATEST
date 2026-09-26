@@ -3,9 +3,6 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './pages/App'
 import './styles.css'
-import { initIdentity } from './identity'
-
-initIdentity()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

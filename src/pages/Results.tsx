@@ -1,10 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getScoreLabel } from '../data/questionBank';
 import {
   scoreAptitude,
-  workAptitudeQuestions,
-  personalityQuestions,
   DIMENSION_LABELS,
   type AptitudeScores,
   type PersonalityDimension,
@@ -164,8 +162,6 @@ export default function Results() {
   const { label, color, description } = isAptitude && aptScores
     ? getScoreLabel(aptScores.aptitudePercent)
     : getScoreLabel(result.score.percent);
-
-  const displayScore = isAptitude && aptScores ? aptScores.aptitudePercent : result.score.percent;
 
   const testTitle: Record<string, string> = {
     iq:       'Intelligence Test',

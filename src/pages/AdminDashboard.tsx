@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { currentToken } from '../identity';
 
 type ResultRow = {
   id: string;
@@ -80,8 +79,9 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         setErr('');
-        const tok = await currentToken();
-        const r = await fetch('/api/getResults', { headers: { Authorization: `Bearer ${tok}` } });
+        const tok = sessionStorage.getItem('matta_admin_token');
+        if (!tok) throw new Error('Sign in from the Results Table page first.');
+        const r = await fetch('/api/admin/results', { headers: { Authorization: `Bearer ${tok}` } });
         if (!r.ok) throw new Error(await r.text());
         const j = await r.json();
         setRows(j.rows || []);
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
             <option value={90}>Last 90 days</option>
             <option value={365}>Last 365 days</option>
           </select>
-          <span className="ml-auto text-xs text-muted">Data source: last 200 submissions from Supabase (getResults).</span>
+          <span className="ml-auto text-xs text-muted">Data source: most recent results from the local database.</span>
         </div>
 
         {loading && <div className="mt-8 text-muted">Loading dashboard…</div>}
@@ -378,7 +378,7 @@ export default function AdminDashboard() {
                 </table>
               </div>
               <div className="mt-3 text-xs text-muted">
-                If you need funnel metrics (Registered → Completed), connect Netlify Identity user list or capture registration events to Supabase.
+                Funnel metrics are not collected; only completed assessments are stored locally.
               </div>
             </div>
           </>

@@ -84,7 +84,7 @@ export default function Landing() {
       sessionStorage.removeItem('lastResult:iq');
       sessionStorage.removeItem('lastResult:english');
       sessionStorage.removeItem('lastResult:aptitude');
-    } catch {}
+    } catch { /* storage may be unavailable */ }
 
     const finalSchool = form.school === 'Other (please specify)' ? otherSchool : form.school;
     sessionStorage.setItem('candidateInfo', JSON.stringify({ ...form, school: finalSchool }));
@@ -98,13 +98,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen text-white" style={BG}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Barlow+Condensed:wght@700;800&display=swap');
-        .font-barlow { font-family: 'Barlow', sans-serif; }
-        .font-barlow-cond { font-family: 'Barlow Condensed', sans-serif; }
-        select option { background: #0f172a; color: white; }
-      `}</style>
-
       <div className="max-w-lg mx-auto px-5 py-12 font-barlow">
 
         {/* HERO HEADER */}

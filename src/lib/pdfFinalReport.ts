@@ -270,7 +270,7 @@ export async function downloadFinalPdf(bundle: any) {
   // ════════════════════════════════════════
   if (bundle.aptitude) {
     Y = section('III. APTITUDE & PERSONALITY', '                        — Behavioural Assessment', C.accent, Y);
-    Y = scoreBlock(doc, Y,
+    scoreBlock(doc, Y,
       bundle.aptitude.score?.percent ?? 0,
       bundle.aptitude.score?.correct ?? 0,
       bundle.aptitude.score?.total   ?? 15,

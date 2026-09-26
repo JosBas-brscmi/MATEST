@@ -4,28 +4,40 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "node --watch api/server.js",
+    "start:api": "node api/server.js",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test:api": "node scripts/smoke-test-api.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "chart.js": "^4.4.1",
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1",
     "jspdf": "^4.2.1",
-    "netlify-identity-widget": "^1.9.2",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.2.2",
+    "typescript-eslint": "^8.70.1",
     "vite": "^7.3.6"
   }
 }

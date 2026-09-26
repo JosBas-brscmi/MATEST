@@ -1,6 +1,6 @@
 // src/lib/pdfReport.ts
 import jsPDF from 'jspdf';
-import type { TestKey } from './index';
+import type { TestKey } from '../lib';
 
 type Score = { correct: number; total: number; percent: number };
 

@@ -324,6 +324,8 @@ export interface AptitudeScores {
   aptitudePercent: number;
   personality:     PersonalityScores;
   roleRecommendation: string[];
+  roleScores: { key: string; dept: string; fn: string; score: number }[];
+  recommendedRoles: string[];
 }
 
 export function scoreAptitude(

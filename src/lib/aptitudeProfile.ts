@@ -1,5 +1,5 @@
 // src/lib/aptitudeProfile.ts
-import type { Question } from './index';
+import type { Question } from '../lib';
 
 export type TraitKey =
   | 'ownership'
@@ -151,23 +151,28 @@ export function computeAptitudeProfile(
   const topTraitNameEN = TRAITS.find((t) => t.key === top1.k)?.en ?? top1.k;
   const topTraitNameZH = TRAITS.find((t) => t.key === top1.k)?.zh ?? top1.k;
 
-  let typeLabelEN = 'Balanced Profile';
-  let typeLabelZH = '均衡型';
-
-  if (overall >= 75 && top1.v >= 80) {
-    typeLabelEN = `High-Potential (${topTraitNameEN}-driven)`;
-    typeLabelZH = `高潛力（以「${topTraitNameZH}」為強項）`;
-  } else if (overall >= 60) {
+  const { typeLabelEN, typeLabelZH } = overall >= 75 && top1.v >= 80
+    ? {
+      typeLabelEN: `High-Potential (${topTraitNameEN}-driven)`,
+      typeLabelZH: `高潛力（以「${topTraitNameZH}」為強項）`,
+    }
+    : overall >= 60
+    ? (() => {
     const top2EN = TRAITS.find((t) => t.key === top2.k)?.en ?? top2.k;
     const top2ZH = TRAITS.find((t) => t.key === top2.k)?.zh ?? top2.k;
-    typeLabelEN = `Operational Fit (${topTraitNameEN} + ${top2EN})`;
-    typeLabelZH = `適配型（${topTraitNameZH}＋${top2ZH}）`;
-  } else {
+      return {
+        typeLabelEN: `Operational Fit (${topTraitNameEN} + ${top2EN})`,
+        typeLabelZH: `適配型（${topTraitNameZH}＋${top2ZH}）`,
+      };
+    })()
+    : (() => {
     const lowEN = TRAITS.find((t) => t.key === low1.k)?.en ?? low1.k;
     const lowZH = TRAITS.find((t) => t.key === low1.k)?.zh ?? low1.k;
-    typeLabelEN = `Needs Review (${topTraitNameEN} strong, ${lowEN} risk)`;
-    typeLabelZH = `需審視（強項：${topTraitNameZH}；風險：${lowZH}）`;
-  }
+      return {
+        typeLabelEN: `Needs Review (${topTraitNameEN} strong, ${lowEN} risk)`,
+        typeLabelZH: `需審視（強項：${topTraitNameZH}；風險：${lowZH}）`,
+      };
+    })();
 
   const lowTraitNameEN = TRAITS.find((t) => t.key === low1.k)?.en ?? low1.k;
   const lowTraitNameZH = TRAITS.find((t) => t.key === low1.k)?.zh ?? low1.k;
