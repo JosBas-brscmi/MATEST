@@ -4,16 +4,18 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import Database from 'better-sqlite3';
 
 const port = 31000 + Math.floor(Math.random() * 20000);
 const adminToken = 'smoke-test-local-admin-token';
 const temporaryDirectory = await mkdtemp(join(tmpdir(), 'matta-api-test-'));
+const databasePath = join(temporaryDirectory, 'test.sqlite');
 const child = spawn(process.execPath, ['api/server.js'], {
   cwd: process.cwd(),
   env: {
     ...process.env,
     PORT: String(port),
-    DB_PATH: join(temporaryDirectory, 'test.sqlite'),
+    DB_PATH: databasePath,
     ADMIN_TOKEN: adminToken,
   },
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -58,6 +60,59 @@ try {
   });
   assert.equal(submission.status, 201, await submission.text());
 
+  const aptitudePayload = {
+    ...payload,
+    testKey: 'APT-SMOKE-TEST-001',
+    testType: 'aptitude',
+    submittedAtISO: new Date(Date.now() + 1000).toISOString(),
+    score: { correct: 12, total: 15, percent: 80 },
+    answers: Object.fromEntries(Array.from({ length: 15 }, (_, index) => [`p${String(index + 1).padStart(2, '0')}`, 2])),
+    autoSubmitted: true,
+  };
+  const aptitudeSubmission = await fetch(`${baseUrl}/api/results`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(aptitudePayload),
+  });
+  assert.equal(aptitudeSubmission.status, 201, await aptitudeSubmission.text());
+
+  const db = new Database(databasePath, { readonly: true, fileMustExist: true });
+  try {
+    const candidate = db.prepare('SELECT * FROM candidates WHERE email = ?').get('smoke@example.test');
+    assert.ok(candidate.id);
+    assert.equal(candidate.full_name, payload.candidateName);
+    assert.equal(candidate.school, payload.candidateSchool);
+    assert.equal(candidate.course, payload.candidateCourse);
+    assert.equal(candidate.phone, payload.candidatePhone);
+    assert.ok(candidate.created_at);
+    assert.ok(candidate.updated_at);
+
+    const readResult = db.prepare('SELECT * FROM assessment_results WHERE test_key = ?').get(payload.testKey);
+    assert.ok(readResult.id);
+    assert.equal(readResult.candidate_id, candidate.id);
+    assert.equal(readResult.test_type, payload.testType);
+    assert.equal(readResult.submitted_at, payload.submittedAtISO);
+    assert.equal(readResult.score_percent, payload.score.percent);
+    assert.equal(readResult.score_correct, payload.score.correct);
+    assert.equal(readResult.score_total, payload.score.total);
+    assert.equal(readResult.auto_submitted, 0);
+    assert.equal(readResult.answers_json, JSON.stringify(payload.answers));
+    assert.equal(readResult.aptitude_report_json, null);
+    assert.deepEqual(JSON.parse(readResult.payload_json), payload);
+    assert.ok(readResult.created_at);
+
+    const aptitudeResult = db.prepare('SELECT * FROM assessment_results WHERE test_key = ?').get(aptitudePayload.testKey);
+    assert.ok(aptitudeResult.aptitude_report_json);
+    assert.deepEqual(JSON.parse(aptitudeResult.aptitude_report_json).personality, {
+      conscientiousness: 50,
+      extraversion: 50,
+      agreeableness: 50,
+      emotional_stability: 50,
+      openness: 50,
+    });
+    assert.deepEqual(JSON.parse(aptitudeResult.answers_json), aptitudePayload.answers);
+  } finally {
+    db.close();
+  }
+
   const duplicate = await fetch(`${baseUrl}/api/results`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
@@ -70,9 +125,10 @@ try {
   });
   assert.equal(authorized.status, 200);
   const resultData = await authorized.json();
-  assert.equal(resultData.rows.length, 1);
-  assert.equal(resultData.rows[0].candidate_email, 'smoke@example.test');
-  assert.equal(resultData.rows[0].test_type, 'iq');
+  assert.equal(resultData.rows.length, 2);
+  assert.ok(resultData.rows.every((row) => row.candidate_email === 'smoke@example.test'));
+  assert.ok(resultData.rows.some((row) => row.test_type === 'iq'));
+  assert.ok(resultData.rows.some((row) => row.test_type === 'aptitude'));
 
   console.log('API smoke test passed: health, validation, save, duplicate protection, and admin authorization.');
 } finally {

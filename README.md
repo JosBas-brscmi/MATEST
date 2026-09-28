@@ -12,7 +12,7 @@ A self-hosted assessment application made of a static React/Vite frontend, a sep
 
 1. Install dependencies with `npm install`.
 2. Copy `.env.example` to `.env` and replace `ADMIN_TOKEN` with a long random secret. For example, generate one with Node: `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
-3. Run `npm run dev`. Vite serves the frontend and proxies `/api` to the local Node API. The API creates `data/matta.sqlite` on first start.
+3. Run `npm run dev`. Vite serves the frontend and proxies `/api` to the local Node API. The API creates `database/trial.db` on first start.
 4. Open `/admin` and use the configured token to view saved results.
 
 The production frontend is built with `npm run build` and emitted to `dist/`. Start the standalone API with `npm run start:api`. Set `DB_PATH` to a durable path outside the static document root in production. `ADMIN_TOKEN` must be configured; without it, admin access fails closed.
@@ -36,7 +36,7 @@ Admin credentials are held in browser `sessionStorage` only for that tab/session
 
 ## Local database
 
-The schema is in [database/schema.sql](database/schema.sql). It separates candidate records from assessment results, enforces a unique candidate email and test key, stores scores and submission metadata in queryable columns, and preserves answers and the submitted payload as JSON text. The database is created automatically at the configured `DB_PATH`.
+The schema is in [database/schema.sql](database/schema.sql). It separates candidate records from assessment results, enforces a unique candidate email and test key, stores scores and submission metadata in queryable columns, and preserves answers and the submitted payload as JSON text. The database is created automatically at `database/trial.db` by default; relative `DB_PATH` values are resolved from the project root.
 
 To move existing records, export the old results table as JSON (an array of rows, including the prior `payload_json` and score columns), then run `node scripts/import-legacy-results.js <exported-results.json>` with `DB_PATH` pointing at the destination database. The importer validates rows and skips test keys already imported. Review a backup and verify record counts before retiring the old database. No remote account was accessed as part of this code migration.
 

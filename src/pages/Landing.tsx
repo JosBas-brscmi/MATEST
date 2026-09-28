@@ -221,8 +221,8 @@ export default function Landing() {
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
                 Phone <span className="text-emerald-400">*</span>
               </label>
-              <input type="tel" value={form.phone} placeholder="+63 917 123 4567"
-                onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
+              <input type="tel" inputMode="numeric" value={form.phone} placeholder="639171234567"
+                onChange={(e) => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '') }))}
                 className={ic('phone')} />
               {errors.phone && <span className="text-red-400 text-xs">{errors.phone}</span>}
             </div>

@@ -9,7 +9,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/MATEST" element={<Landing />} />
-        <Route path="/register" element={<Registration />} />
+        <Route path="/home" element={<Registration />} />
         <Route path="/test" element={<TestRunner />} />
         <Route path="/results" element={<Results />} />
       </Routes>

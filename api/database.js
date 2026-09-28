@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export function openDatabase() {
-  const databasePath = resolve(process.env.DB_PATH || './data/matta.sqlite');
+  const databasePath = resolve(projectRoot, process.env.DB_PATH || 'database/trial.db');
   mkdirSync(dirname(databasePath), { recursive: true });
   const db = new Database(databasePath);
   db.pragma('journal_mode = WAL');

@@ -42,9 +42,13 @@ export default function Registration() {
       </label>
       <input
         type={type}
+        inputMode={name === 'phone' ? 'numeric' : undefined}
         value={form[name]}
         placeholder={placeholder}
-        onChange={(e) => setForm((f) => ({ ...f, [name]: e.target.value }))}
+        onChange={(e) => setForm((f) => ({
+          ...f,
+          [name]: name === 'phone' ? e.target.value.replace(/\D/g, '') : e.target.value,
+        }))}
         className={`bg-gray-900 border rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${
           errors[name] ? 'border-red-500' : 'border-gray-700 hover:border-gray-600'
         }`}
@@ -108,7 +112,7 @@ export default function Registration() {
             <Field label="School / University" name="school" placeholder="e.g. University of Santo Tomas" />
             <Field label="Course / Degree" name="course" placeholder="e.g. BS Business Administration" />
             <Field label="Email Address" name="email" placeholder="e.g. maria@email.com" type="email" />
-            <Field label="Phone Number" name="phone" placeholder="e.g. +63 917 123 4567" type="tel" />
+            <Field label="Phone Number" name="phone" placeholder="e.g. 639171234567" type="tel" />
 
             {/* Agreement */}
             <div
