@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getRandomIQQuestions } from '../data/questionBank';
 import { getRandomEnglishQuestions } from '../data/englishBank';
 import { getAptitudeQuestions } from '../data/aptitudeBank';
-import { TEST_SPECS, scoreSimple, formatDuration } from '../lib';
+import { API_BASE_URL, TEST_SPECS, scoreSimple, formatDuration } from '../lib';
 import type { Question } from '../lib';
 
 // ── Progress helpers ──────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export default function TestRunner() {
       } catch { /* ignore */ }
 
       try {
-        const response = await fetch('/api/results', {
+        const response = await fetch(`${API_BASE_URL}/results`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(resultPayload),

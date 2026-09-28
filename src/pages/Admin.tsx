@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../lib';
 
 type Row = {
   id: string;
@@ -23,7 +25,7 @@ export default function Admin() {
     setLoading(true);
     setErr('');
     try {
-      const response = await fetch('/api/admin/results', {
+      const response = await fetch(`${API_BASE_URL}/admin/results`, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       const data = await response.json().catch(() => ({}));
@@ -68,7 +70,7 @@ export default function Admin() {
           <h2 className="text-2xl font-semibold">Admin Dashboard</h2>
           <div className="text-sm text-muted mt-1">Assessment results stored in the local SQLite database.</div>
         </div>
-        <a href="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</a>
+        <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
       </div>
 
       {!token && (

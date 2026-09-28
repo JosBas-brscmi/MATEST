@@ -26,6 +26,8 @@ export interface TestSpec {
   itemCount: number;
 }
 
+export const API_BASE_URL = `${import.meta.env.BASE_URL}api`;
+
 export const TEST_SPECS: Record<TestKey, TestSpec> = {
   iq:       { key: 'iq',       title: 'IQ Assessment',          durationMinutes: 30, itemCount: 25 },
   english:  { key: 'english',  title: 'English Assessment',      durationMinutes: 25, itemCount: 25 },

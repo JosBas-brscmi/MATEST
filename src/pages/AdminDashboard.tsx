@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../lib';
 
 type ResultRow = {
   id: string;
@@ -81,7 +82,7 @@ export default function AdminDashboard() {
         setErr('');
         const tok = sessionStorage.getItem('matta_admin_token');
         if (!tok) throw new Error('Sign in from the Results Table page first.');
-        const r = await fetch('/api/admin/results', { headers: { Authorization: `Bearer ${tok}` } });
+        const r = await fetch(`${API_BASE_URL}/admin/results`, { headers: { Authorization: `Bearer ${tok}` } });
         if (!r.ok) throw new Error(await r.text());
         const j = await r.json();
         setRows(j.rows || []);
