@@ -19,7 +19,7 @@ The production frontend is built with `npm run build` and emitted to `dist/`. St
 
 ## Production deployment
 
-1. Build the frontend and copy the contents of `dist/` to the nginx/Apache document root.
+1. Build the frontend and upload the complete contents of `dist/` to the nginx/Apache document root, including `index.html` and every file under `assets/`. Do not deploy only the HTML file; its hashed asset names change between builds.
 2. Install the Node dependencies on the API host and run `npm run start:api` under a process manager (systemd, NSSM, PM2, or equivalent). Configure `PORT`, `DB_PATH`, and `ADMIN_TOKEN` in the service environment.
 3. Ensure the API service account can write to the database directory. Keep the SQLite database, `.env`, and backups outside the public web root. Back up the database regularly; with SQLite WAL mode enabled, stop the service or use SQLite's online backup API/CLI for consistent backups.
 4. Configure the web server to proxy `/api/` to `127.0.0.1:3001` before applying the single-page-app fallback. Example configurations are in [deploy/nginx.conf](deploy/nginx.conf) and [deploy/apache-vhost.conf](deploy/apache-vhost.conf). Update the document root and server name for your host and use HTTPS at the web-server layer for deployments handling personal data.
