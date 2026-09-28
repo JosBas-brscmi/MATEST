@@ -1,0 +1,20 @@
+[
+  {"key":"ADM-ADM","dept":"Administration/ADM","fn":"Administration","weights":{"conscientiousness":0.4,"emotional_stability":0.35,"agreeableness":0.25}},
+  {"key":"ADM-HR","dept":"Administration/ADM","fn":"Human Resource","weights":{"agreeableness":0.4,"extraversion":0.35,"emotional_stability":0.25}},
+  {"key":"FA-FA","dept":"Financial Accounting/FA","fn":"Financial Accounting","weights":{"conscientiousness":0.55,"emotional_stability":0.35},"inverse":{"openness":0.1}},
+  {"key":"MS-SL","dept":"Marketing Sales/MS","fn":"Sales","weights":{"extraversion":0.45,"agreeableness":0.3,"emotional_stability":0.25}},
+  {"key":"MS-CS","dept":"Marketing Sales/MS","fn":"Customer Service","weights":{"agreeableness":0.5,"emotional_stability":0.3,"extraversion":0.2}},
+  {"key":"MR-IEC","dept":"Material Resource/MR","fn":"I/E Custom","weights":{"conscientiousness":0.45,"openness":0.3,"emotional_stability":0.25}},
+  {"key":"MR-SC","dept":"Material Resource/MR","fn":"Supply Chain","weights":{"conscientiousness":0.5,"emotional_stability":0.35,"agreeableness":0.15}},
+  {"key":"PMC-PC","dept":"Production & Material Control/PMC","fn":"Production Control","weights":{"conscientiousness":0.5,"emotional_stability":0.4,"agreeableness":0.1}},
+  {"key":"PMC-MC","dept":"Production & Material Control/PMC","fn":"Material Control","weights":{"conscientiousness":0.45,"agreeableness":0.3,"emotional_stability":0.25}},
+  {"key":"QA-QC","dept":"Quality Assurance/QA","fn":"Quality Control","weights":{"conscientiousness":0.55,"emotional_stability":0.3},"inverse":{"extraversion":0.15}},
+  {"key":"QA-QE","dept":"Quality Assurance/QA","fn":"Quality Engineering","weights":{"conscientiousness":0.45,"openness":0.35,"emotional_stability":0.2}},
+  {"key":"PT-PR","dept":"Production Technology/PT","fn":"Process","weights":{"openness":0.45,"conscientiousness":0.35,"emotional_stability":0.2}},
+  {"key":"PT-EQ","dept":"Production Technology/PT","fn":"Equipment","weights":{"conscientiousness":0.4,"openness":0.35,"emotional_stability":0.25}},
+  {"key":"PM-PM","dept":"Production Management/PM","fn":"Production Management","weights":{"extraversion":0.35,"conscientiousness":0.4,"agreeableness":0.25}},
+  {"key":"MI-SW","dept":"Manufacturing Information/MI","fn":"Software","weights":{"openness":0.5,"conscientiousness":0.35,"emotional_stability":0.15}},
+  {"key":"MI-HW","dept":"Manufacturing Information/MI","fn":"Hardware","weights":{"openness":0.4,"conscientiousness":0.4,"emotional_stability":0.2}},
+  {"key":"IE-IE","dept":"Industrial Engineering/IE","fn":"Industrial Engineering","weights":{"openness":0.4,"conscientiousness":0.4,"emotional_stability":0.2}},
+  {"key":"FS-FS","dept":"Facilities Service/FS","fn":"Facilities Service","weights":{"conscientiousness":0.35,"agreeableness":0.35,"emotional_stability":0.3}}
+]

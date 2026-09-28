@@ -1,0 +1,64 @@
+{
+  "likertScale": ["Strongly Disagree","Disagree","Neutral","Agree","Strongly Agree"],
+  "dimensions": {
+    "conscientiousness": {
+      "label": "Conscientiousness",
+      "emoji": "📋",
+      "description": "Reliability, organization, and work ethic"
+    },
+    "extraversion": {
+      "label": "Extraversion",
+      "emoji": "🗣️",
+      "description": "Sociability, assertiveness, and energy"
+    },
+    "agreeableness": {
+      "label": "Agreeableness",
+      "emoji": "🤝",
+      "description": "Cooperation, adaptability, and empathy"
+    },
+    "emotional_stability": {
+      "label": "Emotional Stability",
+      "emoji": "🧘",
+      "description": "Resilience, calmness under pressure"
+    },
+    "openness": {
+      "label": "Openness",
+      "emoji": "💡",
+      "description": "Creativity, curiosity, and innovation"
+    }
+  },
+  "workAptitude": [
+    {"id":"wa01","prompt":"Your manager assigns you three urgent tasks at the same time. What is the best approach?","choices":["Start all three simultaneously to save time","Ask your manager to prioritize them, then work through them in order","Complete the easiest one first to build momentum","Ignore all three until you have more clarity"],"answerIndex":1},
+    {"id":"wa02","prompt":"A colleague shares confidential client information with you without permission. You should:","choices":["Share it further since you already know it","Ignore it and pretend you never heard it","Remind the colleague of confidentiality policies and report if necessary","Use the information to your advantage"],"answerIndex":2},
+    {"id":"wa03","prompt":"You notice a process in your team that is inefficient. What is the most professional response?","choices":["Complain to other colleagues about the inefficiency","Ignore it — it is not your responsibility","Document the issue and propose an improvement to your supervisor","Change the process on your own without informing anyone"],"answerIndex":2},
+    {"id":"wa04","prompt":"During a team meeting, a colleague presents an idea you believe is flawed. You should:","choices":["Stay silent to avoid conflict","Interrupt and immediately point out the flaws","Wait for an appropriate moment and respectfully share your concerns with evidence","Talk to others privately to build opposition against the idea"],"answerIndex":2},
+    {"id":"wa05","prompt":"You made an error that affected a client deliverable. What is the best course of action?","choices":["Hope no one notices and move on","Blame the error on a teammate","Acknowledge the mistake, inform your supervisor, and propose a solution","Redo the work quietly without informing anyone"],"answerIndex":2},
+    {"id":"wa06","prompt":"A client is upset about a delay in delivery. You are not directly responsible. You should:","choices":["Tell the client it is not your fault","Avoid the client until the issue is resolved","Apologize on behalf of the team and provide an updated timeline","Ignore the complaint since you did not cause it"],"answerIndex":2},
+    {"id":"wa07","prompt":"You are given a task outside your expertise. The best response is to:","choices":["Refuse the task immediately","Accept it and attempt to complete it without asking for help","Accept it, research what you can, and ask for guidance where needed","Complete it using guesswork to appear capable"],"answerIndex":2},
+    {"id":"wa08","prompt":"Your team is behind schedule on a critical project. As a team member, you should:","choices":["Work harder individually without coordinating with others","Inform the manager and collaboratively identify where to recover time","Blame team members who are slower","Wait for your manager to notice and solve the issue"],"answerIndex":1},
+    {"id":"wa09","prompt":"You receive negative feedback from your supervisor. The most productive reaction is:","choices":["Become defensive and justify every decision","Ignore the feedback if you disagree","Listen carefully, ask clarifying questions, and use it to improve","Complain to colleagues about the unfair treatment"],"answerIndex":2},
+    {"id":"wa10","prompt":"Two team members are in conflict, affecting team productivity. As a colleague, you should:","choices":["Take sides with the person you are closer to","Encourage them to resolve it professionally or escalate to a supervisor","Spread information about the conflict to other teammates","Ignore it — it is none of your business"],"answerIndex":1},
+    {"id":"wa11","prompt":"You realize mid-project that the initial plan will not achieve the goals. You should:","choices":["Continue with the original plan to avoid extra work","Stop the project immediately without informing stakeholders","Reassess, communicate the issue to stakeholders, and propose adjustments","Pretend the goals were different from the start"],"answerIndex":2},
+    {"id":"wa12","prompt":"A new company policy feels unfair to you and your team. The best approach is:","choices":["Refuse to follow it until it is changed","Openly criticize management to build resentment","Follow the policy while raising your concerns through proper channels","Ignore the policy and do what you think is right"],"answerIndex":2},
+    {"id":"wa13","prompt":"You are asked to present a project update but do not have all the information yet. You should:","choices":["Make up the missing information to appear prepared","Cancel the presentation without notice","Present what you have, clearly state what is pending, and give a timeline","Ask a colleague to present in your place without explanation"],"answerIndex":2},
+    {"id":"wa14","prompt":"You are overwhelmed with work and cannot meet all your deadlines. The best action is:","choices":["Work through the night to finish everything without telling anyone","Inform your manager early and discuss re-prioritizing or getting support","Submit incomplete work without flagging the issues","Take a day off and hope the deadlines are extended"],"answerIndex":1},
+    {"id":"wa15","prompt":"You disagree with a decision made by leadership. The most professional response is:","choices":["Refuse to implement the decision","Complain loudly in the office to gain sympathy","Express your concerns respectfully through the appropriate channel, then support the final decision","Undermine the decision quietly while appearing to comply"],"answerIndex":2}
+  ],
+  "personality": [
+    {"id":"p01","dimension":"conscientiousness","reverse":false,"prompt":"I always complete tasks on time, even when they require extra effort."},
+    {"id":"p02","dimension":"conscientiousness","reverse":false,"prompt":"I set clear goals for myself and consistently work toward them."},
+    {"id":"p03","dimension":"conscientiousness","reverse":true,"prompt":"I often leave tasks unfinished when something more interesting comes along."},
+    {"id":"p04","dimension":"extraversion","reverse":false,"prompt":"I feel energized when working in groups and interacting with many people."},
+    {"id":"p05","dimension":"extraversion","reverse":false,"prompt":"I enjoy taking the lead in group discussions or team projects."},
+    {"id":"p06","dimension":"extraversion","reverse":true,"prompt":"I prefer working alone rather than in a team environment."},
+    {"id":"p07","dimension":"agreeableness","reverse":false,"prompt":"I find it easy to cooperate with people who have different working styles."},
+    {"id":"p08","dimension":"agreeableness","reverse":false,"prompt":"I genuinely care about the well-being of my colleagues."},
+    {"id":"p09","dimension":"agreeableness","reverse":true,"prompt":"I find it difficult to compromise when I believe I am right."},
+    {"id":"p10","dimension":"emotional_stability","reverse":false,"prompt":"I remain calm and focused when working under tight deadlines."},
+    {"id":"p11","dimension":"emotional_stability","reverse":false,"prompt":"I recover quickly from setbacks or professional disappointments."},
+    {"id":"p12","dimension":"emotional_stability","reverse":true,"prompt":"I tend to feel anxious or stressed when facing unexpected changes at work."},
+    {"id":"p13","dimension":"openness","reverse":false,"prompt":"I actively seek out new skills and knowledge relevant to my career."},
+    {"id":"p14","dimension":"openness","reverse":false,"prompt":"I enjoy brainstorming creative solutions to complex problems."},
+    {"id":"p15","dimension":"openness","reverse":true,"prompt":"I prefer established routines over trying new approaches."}
+  ]
+}
