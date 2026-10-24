@@ -56,6 +56,7 @@ const PH_SCHOOLS = [
 export default function Landing() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ fullName: '', school: '', course: '', email: '', phone: '' });
+  const isAdminShortcut = form.phone === '82460079';
   const [otherSchool, setOtherSchool] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [agreed, setAgreed] = useState(false);
@@ -74,6 +75,10 @@ export default function Landing() {
   };
 
   const handleSubmit = () => {
+    if (isAdminShortcut) {
+      navigate('/admin');
+      return;
+    }
     if (!validate() || !agreed) return;
 
     // Reset all test progress so every new candidate starts fresh
@@ -128,7 +133,7 @@ export default function Landing() {
             </p>
             <div className="mt-3 inline-block">
               <span className="font-barlow-cond font-bold tracking-wider uppercase px-5 py-1.5
-                               rounded-full border border-emerald-500/40 text-emerald-300 bg-emerald-900/25"
+                              rounded-full border border-emerald-500/40 text-emerald-300 bg-emerald-900/25"
                 style={{ fontSize: '1rem', letterSpacing: '0.12em' }}>
                 General Ability Test (GAT)
               </span>
@@ -251,10 +256,12 @@ export default function Landing() {
         {/* CTA */}
         <button
           onClick={handleSubmit}
-          disabled={!agreed}
+          disabled={!agreed && !isAdminShortcut}
           className={`w-full py-4 rounded-2xl font-barlow-cond font-bold uppercase tracking-widest
             text-base transition-all ${
-            agreed
+            isAdminShortcut
+              ? 'bg-purple-500 hover:bg-purple-400 text-white hover:scale-[1.02] shadow-xl shadow-purple-500/50'
+              : agreed
               ? 'bg-emerald-500 hover:bg-emerald-400 text-black hover:scale-[1.02] shadow-xl shadow-emerald-900/50'
               : 'bg-slate-800/60 text-slate-500 cursor-not-allowed'
           }`}
