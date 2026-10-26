@@ -8,6 +8,7 @@ const TestRunner = lazy(() => import('./TestRunner'));
 const Results = lazy(() => import('./Results'));
 const ResultsFinal = lazy(() => import('./ResultsFinal'));
 const Admin = lazy(() => import('./Admin'));
+const NewQuiz = lazy(() => import('./NewQuiz'));
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/results/:testKey" element={<Results />} />
 
       <Route path="/admin" element={<Admin />} />
+      <Route path="/admin/quizzes/new" element={<NewQuiz />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -4,7 +4,7 @@ import { getRandomIQQuestions } from '../data/questionBank';
 import { getRandomEnglishQuestions } from '../data/englishBank';
 import { getAptitudeQuestions } from '../data/aptitudeBank';
 import { API_BASE_URL, TEST_SPECS, scoreSimple, formatDuration } from '../lib';
-import type { Question } from '../lib';
+import type { CustomQuiz, Question } from '../lib';
 
 // ── Progress helpers ──────────────────────────────────────────────────────────
 const STORAGE_KEY = 'matta_test_progress_v1';
@@ -46,10 +46,15 @@ export default function TestRunner() {
   const navigate = useNavigate();
 
   const spec      = TEST_SPECS[testKey as keyof typeof TEST_SPECS] ?? TEST_SPECS.iq;
-  const totalTime = spec.durationMinutes * 60;
+  const isCustomQuiz = !['iq', 'english', 'aptitude'].includes(testKey);
   const isAptitude = testKey === 'aptitude';
 
-  const [questions]    = useState<Question[]>(() => loadQuestions(testKey));
+  const [questions, setQuestions] = useState<Question[]>(() => loadQuestions(testKey));
+  const [customQuiz, setCustomQuiz] = useState<CustomQuiz | null>(null);
+  const [quizLoading, setQuizLoading] = useState(isCustomQuiz);
+  const [quizLoadError, setQuizLoadError] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState(spec.durationMinutes);
+  const totalTime = durationMinutes * 60;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers]     = useState<Record<string, number>>({});
   const [timeLeft, setTimeLeft]   = useState(totalTime);
@@ -59,11 +64,30 @@ export default function TestRunner() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!isCustomQuiz) return;
+    fetch(`${API_BASE_URL}/quizzes/${encodeURIComponent(testKey)}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Could not load quiz (${response.status}).`);
+        const quiz = data as CustomQuiz;
+        setCustomQuiz(quiz);
+        setQuestions(quiz.questions.map((question) => ({ ...question, answerIndex: -1 })));
+        setDurationMinutes(quiz.durationMinutes);
+        setTimeLeft(quiz.durationMinutes * 60);
+      })
+      .catch((error: unknown) => {
+        setQuizLoadError(error instanceof Error ? error.message : 'Could not load quiz.');
+      })
+      .finally(() => setQuizLoading(false));
+  }, [isCustomQuiz, testKey]);
+
+  useEffect(() => {
+    if (quizLoading || quizLoadError) return;
     if (questions.length === 0) {
       alert('This assessment is not yet available. Coming soon!');
       navigate('/portal');
     }
-  }, [questions, navigate]);
+  }, [questions, navigate, quizLoading, quizLoadError]);
 
   const submitTest = useCallback(
     async (auto = false) => {
@@ -91,7 +115,8 @@ export default function TestRunner() {
 
       const resultPayload = {
         testKey: testId,
-        testType: testKey,
+        testType: isCustomQuiz ? 'custom' : testKey,
+        ...(customQuiz ? { customQuizId: customQuiz.id, testTitle: customQuiz.title } : {}),
         candidateEmail:  candidateInfo.email    ?? '',
         candidateName:   candidateInfo.fullName ?? '',
         candidateSchool: candidateInfo.school   ?? '',
@@ -104,18 +129,26 @@ export default function TestRunner() {
       };
 
       try {
-        sessionStorage.setItem(`lastResult:${testKey}`, JSON.stringify(resultPayload));
-      } catch { /* ignore */ }
-
-      try {
         const response = await fetch(`${API_BASE_URL}/results`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(resultPayload),
         });
+        const responseBody = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          throw new Error(body.error || `Submission failed (${response.status}).`);
+          throw new Error(responseBody.error || `Submission failed (${response.status}).`);
+        }
+        if (isCustomQuiz) {
+          const serverScore = responseBody.score;
+          if (
+            !serverScore
+            || !Number.isInteger(serverScore.correct)
+            || !Number.isInteger(serverScore.total)
+            || !Number.isInteger(serverScore.percent)
+          ) {
+            throw new Error('The API did not return a valid score for this quiz.');
+          }
+          resultPayload.score = serverScore;
         }
       } catch (e) {
         console.error('Submit error:', e);
@@ -124,15 +157,19 @@ export default function TestRunner() {
         return;
       }
 
+      try {
+        sessionStorage.setItem(`lastResult:${testKey}`, JSON.stringify(resultPayload));
+      } catch { /* ignore */ }
+
       markCompleted(testKey);
       setSubmitted(true);
       navigate(`/results/${testKey}`);
     },
-    [answers, questions, testKey, submitted, submitting, navigate]
+    [answers, questions, testKey, submitted, submitting, navigate, isCustomQuiz, customQuiz]
   );
 
   useEffect(() => {
-    if (submitted || submitting || submitError) return;
+    if (quizLoading || quizLoadError || submitted || submitting || submitError) return;
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) { clearInterval(timerRef.current!); submitTest(true); return 0; }
@@ -140,8 +177,10 @@ export default function TestRunner() {
       });
     }, 1000);
     return () => clearInterval(timerRef.current!);
-  }, [submitTest, submitted, submitting, submitError]);
+  }, [submitTest, submitted, submitting, submitError, quizLoading, quizLoadError]);
 
+  if (quizLoading) return <div className="min-h-screen bg-gray-950 p-8 text-center text-white">Loading quiz…</div>;
+  if (quizLoadError) return <div role="alert" className="min-h-screen bg-gray-950 p-8 text-center text-red-300">{quizLoadError}</div>;
   if (questions.length === 0) return null;
 
   const q             = questions[currentIndex];
@@ -150,7 +189,7 @@ export default function TestRunner() {
   const progressPct   = ((currentIndex + 1) / questions.length) * 100;
   const isLowTime     = timeLeft <= 300;
   const isPersonalityQ = q.type === 'likert';
-  const isReading      = q.prompt.startsWith('📄 Read the passage:');
+  const isReading      = Boolean(q.passage?.trim()) || q.prompt.startsWith('📄 Read the passage:');
   const isAptitudeQ    = q.prompt.startsWith('💼 Workplace Situation:');
 
   // Aptitude section label
@@ -176,6 +215,7 @@ export default function TestRunner() {
           }`} style={{ width: `${timePct}%` }} />
         </div>
 
+        {customQuiz && <span className="hidden max-w-48 truncate text-sm text-gray-300 sm:block">{customQuiz.title}</span>}
         <span className="text-gray-400 text-sm whitespace-nowrap">{currentIndex + 1} / {questions.length}</span>
         <span className="text-xs text-gray-600 hidden md:block">{answeredCount} answered</span>
       </header>
@@ -257,7 +297,7 @@ export default function TestRunner() {
             {/* Type tag */}
             <div className="flex items-center gap-3 mb-4">
               <span className="text-xs text-gray-500 bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
-                {TYPE_LABEL[q.type] ?? q.type}
+                {q.categoryLabel ?? TYPE_LABEL[q.type] ?? q.type}
               </span>
               <div className="flex-1 h-px bg-gray-800" />
             </div>
@@ -273,16 +313,16 @@ export default function TestRunner() {
               <div className="flex flex-col gap-4 mb-6">
                 {(() => {
                   const parts   = q.prompt.split('\n\n');
-                  const passage = parts[1]?.replace(/^"|"$/g, '') ?? '';
-                  const qText   = parts[2] ?? '';
+                  const passage = q.passage ?? parts[1]?.replace(/^"|"$/g, '') ?? '';
+                  const qText   = q.passage ? q.prompt : parts[2] ?? q.prompt;
                   return (
                     <>
-                      <div className="bg-gray-900 border border-blue-900/50 rounded-2xl p-5">
-                        <p className="text-xs text-blue-400 uppercase tracking-wider font-medium mb-2">📄 Passage</p>
+                      <div className="border border-blue-900/50 rounded-2xl p-5" style={{ backgroundColor: q.containerColor ?? '#111827' }}>
+                        <p className="text-xs text-blue-400 uppercase tracking-wider font-medium mb-2">{q.passageTitle || '📄 Passage'}</p>
                         <p className="text-gray-300 text-sm leading-relaxed">{passage}</p>
                       </div>
-                      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-2">Question {currentIndex + 1}</p>
+                      <div className="border border-gray-800 rounded-2xl p-5" style={{ backgroundColor: q.containerColor ?? '#111827' }}>
+                        <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-2">{q.title || `Question ${currentIndex + 1}`}</p>
                         <p className="text-white text-base font-medium leading-relaxed">{qText}</p>
                       </div>
                     </>
@@ -290,9 +330,9 @@ export default function TestRunner() {
                 })()}
               </div>
             ) : isPersonalityQ ? (
-              <div className="bg-purple-900/20 border border-purple-700/40 rounded-2xl p-6 mb-6">
+              <div className="border border-purple-700/40 rounded-2xl p-6 mb-6" style={{ backgroundColor: q.containerColor ?? 'rgba(88, 28, 135, 0.2)' }}>
                 <p className="text-xs text-purple-400 uppercase tracking-wider font-medium mb-3">
-                  Statement {currentIndex - 14} of 15
+                  {q.title || `Statement ${isAptitude ? currentIndex - 14 : currentIndex + 1}`}
                 </p>
                 <p className="text-white text-lg leading-relaxed font-medium">
                   {q.prompt.replace('🧭 Rate your agreement with the following statement:\n\n', '').replace(/^"|"$/g, '')}
@@ -311,8 +351,8 @@ export default function TestRunner() {
                 </p>
               </div>
             ) : (
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
-                <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-3">Question {currentIndex + 1}</p>
+              <div className="border border-gray-800 rounded-2xl p-6 mb-6" style={{ backgroundColor: q.containerColor ?? '#111827' }}>
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-3">{q.title || `Question ${currentIndex + 1}`}</p>
                 <p className="text-white text-lg leading-relaxed whitespace-pre-line font-medium">{q.prompt}</p>
               </div>
             )}
@@ -437,5 +477,3 @@ export default function TestRunner() {
     </div>
   );
 }
-
-

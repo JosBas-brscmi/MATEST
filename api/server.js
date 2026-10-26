@@ -24,11 +24,11 @@ const upsertCandidate = db.prepare(`
 const getCandidate = db.prepare('SELECT id FROM candidates WHERE email = ?');
 const insertResult = db.prepare(`
   INSERT INTO assessment_results (
-    id, candidate_id, test_key, test_type, submitted_at,
+    id, candidate_id, custom_quiz_id, test_key, test_type, submitted_at,
     score_percent, score_correct, score_total, auto_submitted,
     answers_json, aptitude_report_json, payload_json, created_at
   ) VALUES (
-    @id, @candidate_id, @test_key, @test_type, @submitted_at,
+    @id, @candidate_id, @custom_quiz_id, @test_key, @test_type, @submitted_at,
     @score_percent, @score_correct, @score_total, @auto_submitted,
     @answers_json, @aptitude_report_json, @payload_json, @created_at
   )
@@ -51,6 +51,7 @@ const saveResult = db.transaction((payload) => {
   insertResult.run({
     id: resultId,
     candidate_id: candidate.id,
+    custom_quiz_id: payload.customQuizId || null,
     test_key: payload.testKey,
     test_type: payload.testType,
     submitted_at: new Date(payload.submittedAtISO).toISOString(),
@@ -69,19 +70,83 @@ const saveResult = db.transaction((payload) => {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
-app.use(express.json({ limit: '64kb', strict: true }));
+app.use(express.json({ limit: '1mb', strict: true }));
 
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true });
+});
+
+app.get('/api/quizzes', (_request, response) => {
+  const quizzes = db.prepare(`
+    SELECT id, title, duration_minutes, questions_json
+    FROM custom_quizzes
+    ORDER BY created_at DESC
+  `).all().map((quiz) => ({
+    id: quiz.id,
+    title: quiz.title,
+    durationMinutes: quiz.duration_minutes,
+    questionCount: JSON.parse(quiz.questions_json).length,
+  }));
+  return response.json({ quizzes });
+});
+
+app.get('/api/quizzes/:quizId', (request, response) => {
+  const quiz = db.prepare(`
+    SELECT id, title, duration_minutes, questions_json
+    FROM custom_quizzes
+    WHERE id = ?
+  `).get(request.params.quizId);
+  if (!quiz) return response.status(404).json({ error: 'Quiz not found.' });
+  const questions = JSON.parse(quiz.questions_json).map((question) => {
+    const publicQuestion = { ...question };
+    delete publicQuestion.answerIndex;
+    return publicQuestion;
+  });
+  return response.json({
+    id: quiz.id,
+    title: quiz.title,
+    durationMinutes: quiz.duration_minutes,
+    questions,
+  });
+});
+
+app.post('/api/admin/quizzes', requireAdmin, (request, response) => {
+  const validationError = validateCustomQuiz(request.body);
+  if (validationError) return response.status(400).json({ error: validationError });
+
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO custom_quizzes (id, title, duration_minutes, questions_json, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, request.body.title.trim(), request.body.durationMinutes, JSON.stringify(request.body.questions), createdAt);
+  return response.status(201).json({ id });
 });
 
 app.post('/api/results', (request, response) => {
   const validationError = validatePayload(request.body);
   if (validationError) return response.status(400).json({ error: validationError });
 
+  if (request.body.testType === 'custom') {
+    const quiz = db.prepare('SELECT questions_json FROM custom_quizzes WHERE id = ?').get(request.body.customQuizId);
+    if (!quiz) return response.status(400).json({ error: 'The custom quiz could not be found.' });
+    const questions = JSON.parse(quiz.questions_json);
+    const scoredQuestions = questions.filter((question) => question.type !== 'likert');
+    const correct = scoredQuestions.filter((question) => request.body.answers[question.id] === question.answerIndex).length;
+    request.body.score = {
+      correct,
+      total: scoredQuestions.length,
+      percent: Math.round((correct / scoredQuestions.length) * 100),
+    };
+  }
+
   try {
     const id = saveResult(request.body);
-    return response.status(201).json({ ok: true, id });
+    return response.status(201).json({
+      ok: true,
+      id,
+      ...(request.body.testType === 'custom' ? { score: request.body.score } : {}),
+    });
   } catch (error) {
     if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return response.status(409).json({ error: 'This test submission has already been recorded.' });
@@ -91,40 +156,7 @@ app.post('/api/results', (request, response) => {
   }
 });
 
-app.get('/api/admin/results', (request, response) => {
-  const suppliedPassword = request.get('x-admin-password');
-  if (!process.env.ADMIN_PASSWORD) {
-    return response.status(503).json({
-      error: 'Admin access is disabled until ADMIN_PASSWORD is configured.',
-    });
-  }
-
-  const clientAddress = request.ip;
-  const lockout = getAdminLockout(clientAddress);
-  if (lockout) {
-    response.set('Retry-After', String(lockout.retryAfterSeconds));
-    return response.status(429).json({
-      error: `Too many failed password attempts. Try again in ${lockout.retryAfterSeconds} seconds.`,
-    });
-  }
-
-  if (!isAuthorized(suppliedPassword)) {
-    if (suppliedPassword) {
-      const failedAttempts = recordAdminPasswordFailure(clientAddress);
-      if (failedAttempts.lockout) {
-        response.set('Retry-After', String(failedAttempts.lockout.retryAfterSeconds));
-        return response.status(429).json({
-          error: `Too many failed password attempts. Try again in ${failedAttempts.lockout.retryAfterSeconds} seconds.`,
-        });
-      }
-      return response.status(401).json({
-        error: `Admin password is incorrect. ${ADMIN_MAX_FAILED_ATTEMPTS - failedAttempts.attempts} attempt(s) remaining before a one-hour lockout.`,
-      });
-    }
-    return response.status(401).json({ error: 'Admin password is required.' });
-  }
-  failedAdminAttempts.delete(clientAddress);
-
+app.get('/api/admin/results', requireAdmin, (request, response) => {
   const requestedLimit = Number.parseInt(String(request.query.limit || '500'), 10);
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 500;
   const rows = db.prepare(`
@@ -138,9 +170,11 @@ app.get('/api/admin/results', (request, response) => {
       r.score_percent,
       r.score_correct,
       r.score_total,
-      r.auto_submitted
+      r.auto_submitted,
+      q.title AS custom_quiz_title
     FROM assessment_results r
     JOIN candidates c ON c.id = r.candidate_id
+    LEFT JOIN custom_quizzes q ON q.id = r.custom_quiz_id
     ORDER BY r.submitted_at DESC
     LIMIT ?
   `).all(limit);
@@ -176,7 +210,10 @@ function validatePayload(payload) {
     }
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.candidateEmail.trim())) return 'candidateEmail must be a valid email address.';
-  if (!['iq', 'english', 'aptitude'].includes(payload.testType)) return 'testType must be iq, english, or aptitude.';
+  if (!['iq', 'english', 'aptitude', 'custom'].includes(payload.testType)) return 'testType must be iq, english, aptitude, or custom.';
+  if (payload.testType === 'custom' && (typeof payload.customQuizId !== 'string' || !payload.customQuizId)) {
+    return 'customQuizId is required for custom quizzes.';
+  }
   if (typeof payload.submittedAtISO !== 'string' || !Number.isFinite(Date.parse(payload.submittedAtISO))) {
     return 'submittedAtISO must be a valid date.';
   }
@@ -197,6 +234,107 @@ function validatePayload(payload) {
   }
   if (typeof payload.autoSubmitted !== 'boolean') return 'autoSubmitted must be a boolean.';
   return null;
+}
+
+function validateCustomQuiz(quiz) {
+  if (!quiz || typeof quiz !== 'object' || Array.isArray(quiz)) return 'Quiz must be an object.';
+  if (typeof quiz.title !== 'string' || !quiz.title.trim() || quiz.title.length > 120) {
+    return 'Quiz title is required and must not exceed 120 characters.';
+  }
+  if (!Number.isInteger(quiz.durationMinutes) || quiz.durationMinutes < 1 || quiz.durationMinutes > 240) {
+    return 'Quiz duration must be an integer between 1 and 240 minutes.';
+  }
+  if (!Array.isArray(quiz.questions) || quiz.questions.length < 1 || quiz.questions.length > 100) {
+    return 'Quiz must contain between 1 and 100 questions.';
+  }
+  const questionIds = new Set();
+  let scoredQuestionCount = 0;
+  const questionTypes = [
+    'number_series', 'logical_reasoning', 'verbal_analogy', 'figure_reasoning',
+    'grammar', 'vocabulary', 'reading', 'sentence_completion',
+    'error_identification', 'likert', 'custom',
+  ];
+  for (const question of quiz.questions) {
+    if (!question || typeof question !== 'object' || Array.isArray(question)) return 'Each question must be an object.';
+    if (typeof question.id !== 'string' || !question.id || question.id.length > 64 || questionIds.has(question.id)) {
+      return 'Each question must have a unique ID no longer than 64 characters.';
+    }
+    questionIds.add(question.id);
+    if (!questionTypes.includes(question.type)) return 'Each question must use a supported question type.';
+    if (typeof question.prompt !== 'string' || !question.prompt.trim() || question.prompt.length > 4000) {
+      return 'Each question needs text no longer than 4,000 characters.';
+    }
+    if (typeof question.categoryLabel !== 'string' || !question.categoryLabel.trim() || question.categoryLabel.length > 60) {
+      return 'Each question needs a type label no longer than 60 characters.';
+    }
+    if (question.title !== undefined && (typeof question.title !== 'string' || question.title.length > 100)) {
+      return 'Question titles must not exceed 100 characters.';
+    }
+    if (question.passage !== undefined && (typeof question.passage !== 'string' || question.passage.length > 10000)) {
+      return 'Passages must not exceed 10,000 characters.';
+    }
+    if (question.passageTitle !== undefined && (typeof question.passageTitle !== 'string' || question.passageTitle.length > 100)) {
+      return 'Passage titles must not exceed 100 characters.';
+    }
+    if (question.containerColor !== undefined && !/^#[\da-f]{6}$/i.test(question.containerColor)) {
+      return 'Question container colors must be six-digit hex colors.';
+    }
+    const isLikert = question.type === 'likert';
+    const choiceCount = isLikert ? 5 : 4;
+    if (
+      !Array.isArray(question.choices)
+      || question.choices.length !== choiceCount
+      || question.choices.some((choice) => typeof choice !== 'string' || !choice.trim() || choice.length > 500)
+    ) {
+      return `Each ${isLikert ? 'Likert' : 'scored'} question must have ${choiceCount} non-empty choices.`;
+    }
+    if (isLikert) {
+      if (question.answerIndex !== -1) return 'Likert questions must not have a correct answer.';
+    } else {
+      scoredQuestionCount += 1;
+      if (!Number.isInteger(question.answerIndex) || question.answerIndex < 0 || question.answerIndex > 3) {
+        return 'Each scored question must specify a correct answer from A to D.';
+      }
+    }
+  }
+  if (!scoredQuestionCount) return 'A quiz must contain at least one scored question.';
+  if (Buffer.byteLength(JSON.stringify(quiz)) > 900_000) return 'Quiz content is too large.';
+  return null;
+}
+
+function requireAdmin(request, response, next) {
+  if (!process.env.ADMIN_PASSWORD) {
+    return response.status(503).json({
+      error: 'Admin access is disabled until ADMIN_PASSWORD is configured.',
+    });
+  }
+
+  const clientAddress = request.ip;
+  const lockout = getAdminLockout(clientAddress);
+  if (lockout) {
+    response.set('Retry-After', String(lockout.retryAfterSeconds));
+    return response.status(429).json({
+      error: `Too many failed password attempts. Try again in ${lockout.retryAfterSeconds} seconds.`,
+    });
+  }
+
+  if (!isAuthorized(request.get('x-admin-password'))) {
+    const suppliedPassword = request.get('x-admin-password');
+    if (!suppliedPassword) return response.status(401).json({ error: 'Admin password is required.' });
+    const failedAttempts = recordAdminPasswordFailure(clientAddress);
+    if (failedAttempts.lockout) {
+      response.set('Retry-After', String(failedAttempts.lockout.retryAfterSeconds));
+      return response.status(429).json({
+        error: `Too many failed password attempts. Try again in ${failedAttempts.lockout.retryAfterSeconds} seconds.`,
+      });
+    }
+    return response.status(401).json({
+      error: `Admin password is incorrect. ${ADMIN_MAX_FAILED_ATTEMPTS - failedAttempts.attempts} attempt(s) remaining before a one-hour lockout.`,
+    });
+  }
+
+  failedAdminAttempts.delete(clientAddress);
+  return next();
 }
 
 function isAuthorized(supplied) {

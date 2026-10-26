@@ -11,6 +11,7 @@ import {
 interface ResultPayload {
   testKey: string;
   testType: string;
+  testTitle?: string;
   candidateName: string;
   candidateEmail: string;
   candidateSchool: string;
@@ -174,7 +175,7 @@ export default function Results() {
       <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-black font-bold text-xs">MA</div>
-          <span className="text-gray-400 text-sm tracking-widest uppercase">{testTitle[testKey] ?? 'Assessment'} — Complete</span>
+          <span className="text-gray-400 text-sm tracking-widest uppercase">{result.testTitle ?? testTitle[testKey] ?? 'Assessment'} — Complete</span>
         </div>
         <span className="text-xs text-gray-600 font-mono">{result.testKey}</span>
       </header>
@@ -321,7 +322,6 @@ export default function Results() {
     </div>
   );
 }
-
 
 
 

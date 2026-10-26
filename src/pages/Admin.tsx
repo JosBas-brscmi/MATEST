@@ -10,6 +10,7 @@ type Row = {
   candidate_name: string;
   submitted_at: string;
   score_percent: number;
+  custom_quiz_title: string | null;
 };
 
 const PASSWORD_KEY = 'matta_admin_password';
@@ -20,6 +21,7 @@ export default function Admin() {
   const [passwordInput, setPasswordInput] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   async function loadResults(adminPassword: string): Promise<boolean> {
     setLoading(true);
@@ -31,11 +33,13 @@ export default function Admin() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
       setRows(data.rows ?? []);
+      setAuthenticated(true);
       return true;
     } catch (error) {
       sessionStorage.removeItem(PASSWORD_KEY);
       setPassword('');
       setRows([]);
+      setAuthenticated(false);
       setErr(error instanceof Error ? error.message : 'Could not load results.');
       return false;
     } finally {
@@ -63,6 +67,7 @@ export default function Admin() {
     setPassword('');
     setRows([]);
     setErr('');
+    setAuthenticated(false);
   }
 
   return (
@@ -72,7 +77,14 @@ export default function Admin() {
           <h2 className="text-2xl font-semibold">Admin Dashboard</h2>
           <div className="text-sm text-muted mt-1">Assessment results stored in the local SQLite database.</div>
         </div>
-        <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
+        <div className="flex gap-2">
+          {authenticated && (
+            <Link to="/admin/quizzes/new" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400">
+              Create New Quiz
+            </Link>
+          )}
+          <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
+        </div>
       </div>
 
       {!password && (
@@ -116,7 +128,7 @@ export default function Admin() {
                     <tr key={row.id} className="border-b border-white/5">
                       <td className="py-2 pr-4">{new Date(row.submitted_at).toLocaleString()}</td>
                       <td className="py-2 pr-4">{row.candidate_name} ({row.candidate_email})</td>
-                      <td className="py-2 pr-4">{row.test_type}</td>
+                      <td className="py-2 pr-4">{row.custom_quiz_title || row.test_type}</td>
                       <td className="py-2 pr-4">{row.score_percent}%</td>
                       <td className="py-2 pr-4 font-mono text-xs text-muted">{row.id}</td>
                     </tr>

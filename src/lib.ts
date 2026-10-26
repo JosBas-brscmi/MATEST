@@ -6,8 +6,12 @@ export type QuestionType =
   | 'verbal_analogy'
   | 'figure_reasoning'
   | 'grammar'
+  | 'vocabulary'
   | 'reading'
-  | 'likert';
+  | 'sentence_completion'
+  | 'error_identification'
+  | 'likert'
+  | 'custom';
 
 export interface Question {
   id: string;
@@ -15,6 +19,11 @@ export interface Question {
   prompt: string;
   choices: string[];
   answerIndex: number;
+  categoryLabel?: string;
+  title?: string;
+  passage?: string;
+  passageTitle?: string;
+  containerColor?: string;
   explanation?: string;
   figure?: string;
 }
@@ -24,6 +33,20 @@ export interface TestSpec {
   title: string;
   durationMinutes: number;
   itemCount: number;
+}
+
+export interface CustomQuiz {
+  id: string;
+  title: string;
+  durationMinutes: number;
+  questions: Array<Omit<Question, 'answerIndex'> & { answerIndex?: number }>;
+}
+
+export interface CustomQuizSummary {
+  id: string;
+  title: string;
+  durationMinutes: number;
+  questionCount: number;
 }
 
 export const API_BASE_URL = `${import.meta.env.BASE_URL}api`;

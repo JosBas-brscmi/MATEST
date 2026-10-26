@@ -31,8 +31,12 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 - `GET /api/health` — local API health check.
 - `POST /api/results` — validates and saves one assessment submission.
 - `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires the configured password in the `X-Admin-Password` header.
+- `GET /api/quizzes` and `GET /api/quizzes/:quizId` — list published custom quizzes and load a quiz for candidates.
+- `POST /api/admin/quizzes` — creates and immediately publishes a custom quiz; requires admin password.
 
 The admin password is held in browser `sessionStorage` only for that tab/session and is sent to the API over HTTPS. Four incorrect password attempts from the same client address within an hour trigger a one-hour lockout. Lockout counters are kept in API memory and reset when the API process restarts. Use a unique password and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-password setup is intentionally simple; it is not an individual user-account system.
+
+From the admin results page, create quizzes with a duration, titled question cards, optional titled passages, per-question container colors, and question type labels. Scored questions use four A–D choices and one correct answer. Likert questions use the existing five-point agreement scale and do not count toward the score. New quizzes appear independently in the candidate portal as soon as they are published.
 
 ## Local database
 
@@ -42,7 +46,7 @@ To move existing records, export the old results table as JSON (an array of rows
 
 ## Important assessment limitations
 
-- Assessment answers, question banks, and scoring still run in the browser. The API validates payload shape and score consistency but cannot prove that a submitted score or identity is genuine. For high-stakes use, move question selection and scoring server-side and add per-candidate authentication/attempt controls.
+- The original fixed-test question banks and scoring still run in the browser. Custom quiz answer keys are withheld from candidates and their scores are calculated by the API, but the API cannot prove a candidate's identity or enforce attempt controls. For high-stakes use, add per-candidate authentication and stronger assessment controls.
 - The final-report email feature was removed rather than retaining an external mail dependency. Results remain available in the local admin dashboard and database.
 - The local SQLite database contains personal and assessment data. Set restrictive filesystem permissions, limit admin/network access, define a retention policy, and protect backups.
 

@@ -1,7 +1,8 @@
 // src/pages/Portal.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TEST_SPECS, TestKey } from '../lib';
+import { API_BASE_URL, TEST_SPECS, TestKey } from '../lib';
+import type { CustomQuizSummary } from '../lib';
 import { resetAllLocalState } from '../lib/resultsStore';
 
 type ProgressState = 'locked' | 'available' | 'completed';
@@ -29,6 +30,8 @@ function load(): ProgressMap {
 export default function Portal() {
   const nav = useNavigate();
   const [progress, setProgress] = useState<ProgressMap>(() => load());
+  const [customQuizzes, setCustomQuizzes] = useState<CustomQuizSummary[]>([]);
+  const [customQuizError, setCustomQuizError] = useState('');
 
   const candidateName = (() => {
     try {
@@ -49,6 +52,18 @@ export default function Portal() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [nav]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/quizzes`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Could not load quizzes (${response.status}).`);
+        setCustomQuizzes(data.quizzes ?? []);
+      })
+      .catch((error: unknown) => {
+        setCustomQuizError(error instanceof Error ? error.message : 'Could not load custom quizzes.');
+      });
+  }, []);
 
   const allDone = useMemo(() =>
     progress.iq === 'completed' &&
@@ -162,6 +177,28 @@ export default function Portal() {
           </p>
         </div>
 
+        {(customQuizzes.length > 0 || customQuizError) && (
+          <section className="mb-6">
+            <h2 className="mb-3 text-base font-bold text-white">Additional Quizzes</h2>
+            {customQuizError && <div role="alert" className="mb-3 rounded-xl border border-red-700/40 bg-red-950/30 p-3 text-sm text-red-300">{customQuizError}</div>}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {customQuizzes.map((quiz) => (
+                <div key={quiz.id} className="flex flex-col rounded-2xl border border-emerald-500/20 bg-slate-800/40 p-6 backdrop-blur">
+                  <div className="mb-2 text-lg font-bold text-emerald-300">{quiz.title}</div>
+                  <div className="mb-1 text-sm text-slate-400">Duration: {quiz.durationMinutes} min</div>
+                  <div className="mb-5 flex-1 text-sm text-slate-500">Questions: {quiz.questionCount}</div>
+                  <button
+                    onClick={() => nav(`/test/${encodeURIComponent(quiz.id)}`)}
+                    className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:scale-[1.02]"
+                  >
+                    Start Quiz
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Assessment cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {cards.map(({ key, phase, title, colorClass, titleColor, sub, dur, items, btnColor }) => (
@@ -253,5 +290,3 @@ export default function Portal() {
     </div>
   );
 }
-
-

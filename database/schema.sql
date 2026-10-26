@@ -11,11 +11,20 @@ CREATE TABLE IF NOT EXISTS candidates (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS custom_quizzes (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 1 AND 240),
+  questions_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS assessment_results (
   id TEXT PRIMARY KEY,
   candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE RESTRICT,
+  custom_quiz_id TEXT REFERENCES custom_quizzes(id) ON DELETE RESTRICT,
   test_key TEXT NOT NULL UNIQUE,
-  test_type TEXT NOT NULL CHECK (test_type IN ('iq', 'english', 'aptitude')),
+  test_type TEXT NOT NULL CHECK (test_type IN ('iq', 'english', 'aptitude', 'custom')),
   submitted_at TEXT NOT NULL,
   score_percent INTEGER NOT NULL CHECK (score_percent BETWEEN 0 AND 100),
   score_correct INTEGER NOT NULL CHECK (score_correct >= 0),
