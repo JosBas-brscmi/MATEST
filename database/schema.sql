@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS custom_quizzes (
 CREATE TABLE IF NOT EXISTS assessment_results (
   id TEXT PRIMARY KEY,
   candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE RESTRICT,
-  custom_quiz_id TEXT REFERENCES custom_quizzes(id) ON DELETE RESTRICT,
+  custom_quiz_id TEXT REFERENCES custom_quizzes(id) ON DELETE SET NULL,
   test_key TEXT NOT NULL UNIQUE,
   test_type TEXT NOT NULL CHECK (test_type IN ('iq', 'english', 'aptitude', 'custom')),
   submitted_at TEXT NOT NULL,

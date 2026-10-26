@@ -32,11 +32,13 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 - `POST /api/results` — validates and saves one assessment submission.
 - `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires the configured password in the `X-Admin-Password` header.
 - `GET /api/quizzes` and `GET /api/quizzes/:quizId` — list published custom quizzes and load a quiz for candidates.
+- `GET /api/admin/quizzes` and `GET /api/admin/quizzes/:quizId` — list quizzes and load an editable quiz; require admin password.
 - `POST /api/admin/quizzes` — creates and immediately publishes a custom quiz; requires admin password.
+- `PUT /api/admin/quizzes/:quizId` and `DELETE /api/admin/quizzes/:quizId` — modify or remove a quiz; require admin password.
 
 The admin password is held in browser `sessionStorage` only for that tab/session and is sent to the API over HTTPS. Four incorrect password attempts from the same client address within an hour trigger a one-hour lockout. Lockout counters are kept in API memory and reset when the API process restarts. Use a unique password and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-password setup is intentionally simple; it is not an individual user-account system.
 
-From the admin results page, create quizzes with a duration, titled question cards, optional titled passages, per-question container colors, and question type labels. Scored questions use four A–D choices and one correct answer. Likert questions use the existing five-point agreement scale and do not count toward the score. New quizzes appear independently in the candidate portal as soon as they are published.
+From the admin dashboard, create, remove, or modify quizzes. Quiz removal requires confirmation, unpublishes it from the candidate portal, and preserves historical submissions and their quiz title. Editing changes the quiz candidates see going forward. Quizzes support a duration, titled question cards, optional titled passages, per-question container colors, and question type labels. Scored questions use four A–D choices and one correct answer. Likert questions use the existing five-point agreement scale and do not count toward the score. New quizzes appear independently in the candidate portal as soon as they are published.
 
 ## Local database
 

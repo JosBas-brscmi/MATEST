@@ -9,6 +9,7 @@ const Results = lazy(() => import('./Results'));
 const ResultsFinal = lazy(() => import('./ResultsFinal'));
 const Admin = lazy(() => import('./Admin'));
 const NewQuiz = lazy(() => import('./NewQuiz'));
+const ManageQuizzes = lazy(() => import('./ManageQuizzes'));
 
 export default function App() {
   return (
@@ -29,6 +30,9 @@ export default function App() {
 
       <Route path="/admin" element={<Admin />} />
       <Route path="/admin/quizzes/new" element={<NewQuiz />} />
+      <Route path="/admin/quizzes/remove" element={<ManageQuizzes mode="remove" />} />
+      <Route path="/admin/quizzes/modify" element={<ManageQuizzes mode="modify" />} />
+      <Route path="/admin/quizzes/:quizId/edit" element={<NewQuiz />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

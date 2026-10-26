@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { API_BASE_URL } from '../lib';
-import type { Question, QuestionType } from '../lib';
+import type { CustomQuiz, Question, QuestionType } from '../lib';
 import aptitudeData from '../data/aptitude.json';
 
 const PASSWORD_KEY = 'matta_admin_password';
@@ -36,11 +36,44 @@ function makeQuestion(): Question {
 
 export default function NewQuiz() {
   const navigate = useNavigate();
+  const { quizId } = useParams();
+  const isEditing = Boolean(quizId);
   const [title, setTitle] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingQuiz, setLoadingQuiz] = useState(isEditing);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!quizId) return;
+    const adminPassword = sessionStorage.getItem(PASSWORD_KEY);
+    if (!adminPassword) {
+      setError('Your admin session has expired. Sign in again.');
+      setLoadingQuiz(false);
+      return;
+    }
+    fetch(`${API_BASE_URL}/admin/quizzes/${encodeURIComponent(quizId)}`, {
+      headers: { 'X-Admin-Password': adminPassword },
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Could not load quiz (${response.status}).`);
+        const quiz = data as CustomQuiz;
+        setTitle(quiz.title);
+        setDurationMinutes(quiz.durationMinutes);
+        setQuestions(quiz.questions.map((question) => {
+          if (typeof question.answerIndex !== 'number') {
+            throw new Error('Quiz data is missing an answer key.');
+          }
+          return { ...question, answerIndex: question.answerIndex };
+        }));
+      })
+      .catch((loadError: unknown) => {
+        setError(loadError instanceof Error ? loadError.message : 'Could not load quiz.');
+      })
+      .finally(() => setLoadingQuiz(false));
+  }, [quizId]);
 
   function updateQuestion(index: number, updates: Partial<Question>) {
     setQuestions((current) => current.map((question, questionIndex) =>
@@ -76,8 +109,8 @@ export default function NewQuiz() {
     try {
       const adminPassword = sessionStorage.getItem(PASSWORD_KEY);
       if (!adminPassword) throw new Error('Your admin session has expired. Sign in again.');
-      const response = await fetch(`${API_BASE_URL}/admin/quizzes`, {
-        method: 'POST',
+      const response = await fetch(`${API_BASE_URL}/admin/quizzes${quizId ? `/${encodeURIComponent(quizId)}` : ''}`, {
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Admin-Password': adminPassword,
@@ -85,10 +118,10 @@ export default function NewQuiz() {
         body: JSON.stringify({ title, durationMinutes, questions }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `Could not create quiz (${response.status}).`);
+      if (!response.ok) throw new Error(data.error || `Could not ${isEditing ? 'update' : 'create'} quiz (${response.status}).`);
       navigate('/admin');
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Could not create quiz.');
+      setError(createError instanceof Error ? createError.message : `Could not ${isEditing ? 'update' : 'create'} quiz.`);
     } finally {
       setLoading(false);
     }
@@ -100,13 +133,16 @@ export default function NewQuiz() {
         <div className="mb-8 flex items-center justify-between gap-4">
           <div>
             <div className="text-xs uppercase tracking-widest text-emerald-400">Admin</div>
-            <h1 className="mt-1 text-2xl font-bold">Create New Quiz</h1>
-            <p className="mt-2 text-sm text-gray-400">Saved quizzes become available to candidates in the portal immediately.</p>
+            <h1 className="mt-1 text-2xl font-bold">{isEditing ? 'Modify Quiz' : 'Create Quiz'}</h1>
+            <p className="mt-2 text-sm text-gray-400">
+              {isEditing ? 'Changes are saved to this quiz and shown to candidates immediately.' : 'Saved quizzes become available to candidates in the portal immediately.'}
+            </p>
           </div>
           <Link to="/admin" className="rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5">Back</Link>
         </div>
 
-        <form onSubmit={createQuiz} className="space-y-6">
+        {loadingQuiz && <p className="text-sm text-gray-400">Loading quiz…</p>}
+        <form onSubmit={createQuiz} className={`space-y-6${loadingQuiz ? ' hidden' : ''}`}>
           <section className="rounded-2xl border border-white/10 bg-gray-900/70 p-5">
             <label className="block text-sm font-semibold" htmlFor="quiz-title">Quiz title</label>
             <input
@@ -281,7 +317,7 @@ export default function NewQuiz() {
               disabled={loading || questions.length === 0}
               className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-black hover:bg-emerald-400 disabled:opacity-50"
             >
-              {loading ? 'Publishing…' : 'Publish quiz'}
+              {loading ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish quiz')}
             </button>
           </div>
           {questions.length === 0 && <p className="text-sm text-gray-500">Add at least one question. Each quiz must include a scored question.</p>}

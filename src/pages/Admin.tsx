@@ -72,16 +72,24 @@ export default function Admin() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold">Admin Dashboard</h2>
           <div className="text-sm text-muted mt-1">Assessment results stored in the local SQLite database.</div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {authenticated && (
-            <Link to="/admin/quizzes/new" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400">
-              Create New Quiz
-            </Link>
+            <>
+              <Link to="/admin/quizzes/new" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400">
+                Create Quiz
+              </Link>
+              <Link to="/admin/quizzes/remove" className="rounded-xl border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10">
+                Remove Quiz
+              </Link>
+              <Link to="/admin/quizzes/modify" className="rounded-xl border border-sky-500/40 px-4 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/10">
+                Modify Quiz
+              </Link>
+            </>
           )}
           <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
         </div>

@@ -26,7 +26,11 @@ function migrateCustomQuizResults(db) {
   `).get();
   const hasQuizColumn = columns.some((column) => column.name === 'custom_quiz_id');
   const supportsCustomType = table?.sql?.includes("'custom'");
-  if (hasQuizColumn && supportsCustomType) return;
+  const quizForeignKey = db.pragma('foreign_key_list(assessment_results)')
+    .find((foreignKey) => foreignKey.table === 'custom_quizzes' && foreignKey.from === 'custom_quiz_id');
+  const preservesQuizResults = quizForeignKey?.on_delete === 'SET NULL';
+  if (hasQuizColumn && supportsCustomType && preservesQuizResults) return;
+  const quizIdColumn = hasQuizColumn ? 'custom_quiz_id, ' : '';
 
   db.transaction(() => {
     db.exec(`
@@ -35,7 +39,7 @@ function migrateCustomQuizResults(db) {
       CREATE TABLE assessment_results (
         id TEXT PRIMARY KEY,
         candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE RESTRICT,
-        custom_quiz_id TEXT REFERENCES custom_quizzes(id) ON DELETE RESTRICT,
+        custom_quiz_id TEXT REFERENCES custom_quizzes(id) ON DELETE SET NULL,
         test_key TEXT NOT NULL UNIQUE,
         test_type TEXT NOT NULL CHECK (test_type IN ('iq', 'english', 'aptitude', 'custom')),
         submitted_at TEXT NOT NULL,
@@ -50,12 +54,12 @@ function migrateCustomQuizResults(db) {
       );
 
       INSERT INTO assessment_results (
-        id, candidate_id, test_key, test_type, submitted_at,
+        id, candidate_id, ${quizIdColumn}test_key, test_type, submitted_at,
         score_percent, score_correct, score_total, auto_submitted,
         answers_json, aptitude_report_json, payload_json, created_at
       )
       SELECT
-        id, candidate_id, test_key, test_type, submitted_at,
+        id, candidate_id, ${quizIdColumn}test_key, test_type, submitted_at,
         score_percent, score_correct, score_total, auto_submitted,
         answers_json, aptitude_report_json, payload_json, created_at
       FROM assessment_results_legacy;

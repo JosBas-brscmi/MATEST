@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 import Database from 'better-sqlite3';
+import { openDatabase } from '../api/database.js';
 
 const port = 31000 + Math.floor(Math.random() * 20000);
 const adminPassword = 'smoke-test-local-admin-password';
@@ -50,6 +51,74 @@ legacyDatabase.prepare(`
   ) VALUES ('legacy-result', 'legacy-candidate', 'IQ-LEGACY-001', 'iq', ?, 80, 4, 5, 0, '{}', NULL, '{}', ?)
 `).run(new Date().toISOString(), new Date().toISOString());
 legacyDatabase.close();
+
+const previousDbPath = process.env.DB_PATH;
+const quizMigrationPath = join(temporaryDirectory, 'quiz-migration.sqlite');
+const preDeleteMigrationDb = new Database(quizMigrationPath);
+preDeleteMigrationDb.exec(`
+  CREATE TABLE candidates (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    full_name TEXT NOT NULL,
+    school TEXT NOT NULL,
+    course TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE custom_quizzes (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    questions_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE assessment_results (
+    id TEXT PRIMARY KEY,
+    candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE RESTRICT,
+    custom_quiz_id TEXT REFERENCES custom_quizzes(id) ON DELETE RESTRICT,
+    test_key TEXT NOT NULL UNIQUE,
+    test_type TEXT NOT NULL CHECK (test_type IN ('iq', 'english', 'aptitude', 'custom')),
+    submitted_at TEXT NOT NULL,
+    score_percent INTEGER NOT NULL,
+    score_correct INTEGER NOT NULL,
+    score_total INTEGER NOT NULL,
+    auto_submitted INTEGER NOT NULL DEFAULT 0,
+    answers_json TEXT NOT NULL,
+    aptitude_report_json TEXT,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO candidates VALUES ('migration-candidate', 'migration@example.test', 'Migration', '', '', '', 'now', 'now');
+  INSERT INTO custom_quizzes VALUES ('migration-quiz', 'Migration Quiz', 30, '[]', 'now');
+  INSERT INTO assessment_results VALUES (
+    'migration-result', 'migration-candidate', 'migration-quiz', 'MIGRATION-RESULT', 'custom',
+    'now', 100, 1, 1, 0, '{}', NULL,
+    '{"testTitle":"Migration Quiz"}', 'now'
+  );
+`);
+preDeleteMigrationDb.close();
+process.env.DB_PATH = quizMigrationPath;
+const { db: quizMigrationDb } = openDatabase();
+try {
+  const migratedResult = quizMigrationDb.prepare('SELECT custom_quiz_id, payload_json FROM assessment_results WHERE id = ?')
+    .get('migration-result');
+  assert.equal(migratedResult.custom_quiz_id, 'migration-quiz');
+  assert.equal(JSON.parse(migratedResult.payload_json).testTitle, 'Migration Quiz');
+  const migratedForeignKey = quizMigrationDb.pragma('foreign_key_list(assessment_results)')
+    .find((foreignKey) => foreignKey.table === 'custom_quizzes' && foreignKey.from === 'custom_quiz_id');
+  assert.equal(migratedForeignKey.on_delete, 'SET NULL');
+  quizMigrationDb.prepare('DELETE FROM custom_quizzes WHERE id = ?').run('migration-quiz');
+  assert.equal(
+    quizMigrationDb.prepare('SELECT custom_quiz_id FROM assessment_results WHERE id = ?').get('migration-result').custom_quiz_id,
+    null,
+  );
+} finally {
+  quizMigrationDb.close();
+  if (previousDbPath === undefined) delete process.env.DB_PATH;
+  else process.env.DB_PATH = previousDbPath;
+}
+
 const child = spawn(process.execPath, ['api/server.js'], {
   cwd: process.cwd(),
   env: {
@@ -148,11 +217,38 @@ try {
   const createQuizResponse = await createQuiz.json();
   assert.equal(createQuiz.status, 201, JSON.stringify(createQuizResponse));
   const { id: customQuizId } = createQuizResponse;
-  const listedQuizzes = await fetch(`${baseUrl}/api/quizzes`);
-  assert.deepEqual((await listedQuizzes.json()).quizzes, [{
+  const unauthorizedQuizList = await fetch(`${baseUrl}/api/admin/quizzes`);
+  assert.equal(unauthorizedQuizList.status, 401);
+  const authorizedQuizList = await fetch(`${baseUrl}/api/admin/quizzes`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(authorizedQuizList.status, 200);
+  assert.deepEqual((await authorizedQuizList.json()).quizzes, [{
     id: customQuizId,
     title: customQuiz.title,
     durationMinutes: customQuiz.durationMinutes,
+    questionCount: 2,
+  }]);
+
+  const adminQuizResponse = await fetch(`${baseUrl}/api/admin/quizzes/${customQuizId}`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(adminQuizResponse.status, 200);
+  assert.deepEqual((await adminQuizResponse.json()).questions, customQuiz.questions);
+
+  const updatedQuiz = { ...customQuiz, title: 'Updated Custom Smoke Quiz', durationMinutes: 45 };
+  const updateQuizResponse = await fetch(`${baseUrl}/api/admin/quizzes/${customQuizId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify(updatedQuiz),
+  });
+  assert.equal(updateQuizResponse.status, 200, await updateQuizResponse.text());
+
+  const listedQuizzes = await fetch(`${baseUrl}/api/quizzes`);
+  assert.deepEqual((await listedQuizzes.json()).quizzes, [{
+    id: customQuizId,
+    title: updatedQuiz.title,
+    durationMinutes: updatedQuiz.durationMinutes,
     questionCount: 2,
   }]);
   const fetchedQuiz = await fetch(`${baseUrl}/api/quizzes/${customQuizId}`);
@@ -165,7 +261,7 @@ try {
     testKey: `CUSTOM-${customQuizId}-SMOKE`,
     testType: 'custom',
     customQuizId,
-    testTitle: customQuiz.title,
+    testTitle: updatedQuiz.title,
     submittedAtISO: new Date(Date.now() + 2000).toISOString(),
     score: { correct: 0, total: 1, percent: 0 },
     answers: { 'custom-q1': 0, 'custom-q2': 4 },
@@ -182,6 +278,9 @@ try {
   const db = new Database(databasePath, { readonly: true, fileMustExist: true });
   try {
     assert.ok(db.prepare('SELECT id FROM assessment_results WHERE id = ?').get('legacy-result'));
+    const quizForeignKey = db.pragma('foreign_key_list(assessment_results)')
+      .find((foreignKey) => foreignKey.table === 'custom_quizzes' && foreignKey.from === 'custom_quiz_id');
+    assert.equal(quizForeignKey.on_delete, 'SET NULL');
     const storedCustomResult = db.prepare('SELECT custom_quiz_id, test_type FROM assessment_results WHERE test_key = ?').get(customResultPayload.testKey);
     assert.equal(storedCustomResult.custom_quiz_id, customQuizId);
     assert.equal(storedCustomResult.test_type, 'custom');
@@ -243,7 +342,33 @@ try {
   assert.ok(resultData.rows.filter((row) => row.test_key !== 'IQ-LEGACY-001').every((row) => row.candidate_email === 'smoke@example.test'));
   assert.ok(resultData.rows.some((row) => row.test_type === 'iq'));
   assert.ok(resultData.rows.some((row) => row.test_type === 'aptitude'));
-  assert.ok(resultData.rows.some((row) => row.custom_quiz_title === customQuiz.title));
+  assert.ok(resultData.rows.some((row) => row.custom_quiz_title === updatedQuiz.title));
+
+  const deleteQuizResponse = await fetch(`${baseUrl}/api/admin/quizzes/${customQuizId}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(deleteQuizResponse.status, 200, await deleteQuizResponse.text());
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/quizzes`)).json()).quizzes, []);
+  assert.equal((await fetch(`${baseUrl}/api/quizzes/${customQuizId}`)).status, 404);
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/admin/quizzes`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  })).json()).quizzes, []);
+
+  const resultsAfterQuizRemoval = await fetch(`${baseUrl}/api/admin/results`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  const preservedResults = await resultsAfterQuizRemoval.json();
+  const preservedQuizResult = preservedResults.rows.find((row) => row.test_key === customResultPayload.testKey);
+  assert.equal(preservedQuizResult.custom_quiz_title, updatedQuiz.title);
+  const resultsDb = new Database(databasePath, { readonly: true, fileMustExist: true });
+  try {
+    const preservedQuizRecord = resultsDb.prepare('SELECT custom_quiz_id FROM assessment_results WHERE test_key = ?')
+      .get(customResultPayload.testKey);
+    assert.equal(preservedQuizRecord.custom_quiz_id, null);
+  } finally {
+    resultsDb.close();
+  }
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const failedAttempt = await fetch(`${baseUrl}/api/admin/results`, {

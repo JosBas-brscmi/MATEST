@@ -110,6 +110,35 @@ app.get('/api/quizzes/:quizId', (request, response) => {
   });
 });
 
+app.get('/api/admin/quizzes', requireAdmin, (_request, response) => {
+  const quizzes = db.prepare(`
+    SELECT id, title, duration_minutes, questions_json
+    FROM custom_quizzes
+    ORDER BY created_at DESC
+  `).all().map((quiz) => ({
+    id: quiz.id,
+    title: quiz.title,
+    durationMinutes: quiz.duration_minutes,
+    questionCount: JSON.parse(quiz.questions_json).length,
+  }));
+  return response.json({ quizzes });
+});
+
+app.get('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
+  const quiz = db.prepare(`
+    SELECT id, title, duration_minutes, questions_json
+    FROM custom_quizzes
+    WHERE id = ?
+  `).get(request.params.quizId);
+  if (!quiz) return response.status(404).json({ error: 'Quiz not found.' });
+  return response.json({
+    id: quiz.id,
+    title: quiz.title,
+    durationMinutes: quiz.duration_minutes,
+    questions: JSON.parse(quiz.questions_json),
+  });
+});
+
 app.post('/api/admin/quizzes', requireAdmin, (request, response) => {
   const validationError = validateCustomQuiz(request.body);
   if (validationError) return response.status(400).json({ error: validationError });
@@ -121,6 +150,25 @@ app.post('/api/admin/quizzes', requireAdmin, (request, response) => {
     VALUES (?, ?, ?, ?, ?)
   `).run(id, request.body.title.trim(), request.body.durationMinutes, JSON.stringify(request.body.questions), createdAt);
   return response.status(201).json({ id });
+});
+
+app.put('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
+  const validationError = validateCustomQuiz(request.body);
+  if (validationError) return response.status(400).json({ error: validationError });
+
+  const result = db.prepare(`
+    UPDATE custom_quizzes
+    SET title = ?, duration_minutes = ?, questions_json = ?
+    WHERE id = ?
+  `).run(request.body.title.trim(), request.body.durationMinutes, JSON.stringify(request.body.questions), request.params.quizId);
+  if (!result.changes) return response.status(404).json({ error: 'Quiz not found.' });
+  return response.json({ ok: true });
+});
+
+app.delete('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
+  const result = db.prepare('DELETE FROM custom_quizzes WHERE id = ?').run(request.params.quizId);
+  if (!result.changes) return response.status(404).json({ error: 'Quiz not found.' });
+  return response.json({ ok: true });
 });
 
 app.post('/api/results', (request, response) => {
@@ -171,7 +219,7 @@ app.get('/api/admin/results', requireAdmin, (request, response) => {
       r.score_correct,
       r.score_total,
       r.auto_submitted,
-      q.title AS custom_quiz_title
+      COALESCE(json_extract(r.payload_json, '$.testTitle'), q.title) AS custom_quiz_title
     FROM assessment_results r
     JOIN candidates c ON c.id = r.candidate_id
     LEFT JOIN custom_quizzes q ON q.id = r.custom_quiz_id
