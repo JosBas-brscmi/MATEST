@@ -10,7 +10,7 @@ export default function Home() {
       </div>
       <div className="mx-auto max-w-6xl px-4 py-12 sm:py-20 relative">
         <div className="flex items-center gap-4">
-          <img src="/matta-logo.png" className="h-14 w-14 rounded-full shadow-glow" alt="MATTA logo" />
+          <img src={`${import.meta.env.BASE_URL}matta-logo.png`} className="h-14 w-14 rounded-full shadow-glow" alt="MATTA logo" />
           <div>
             <div className="text-sm text-muted tracking-widest">BROWAVE CORPORATION</div>
             <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight">MATTA CENTER</h1>

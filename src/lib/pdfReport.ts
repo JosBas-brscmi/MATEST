@@ -56,8 +56,8 @@ async function ensureFonts(doc: jsPDF) {
   //  - public/fonts/NotoSansTC-Bold.ttf
   try {
     const [regB64, boldB64] = await Promise.all([
-      fetchAsBase64('/fonts/NotoSansTC-Regular.ttf'),
-      fetchAsBase64('/fonts/NotoSansTC-Bold.ttf'),
+      fetchAsBase64(`${import.meta.env.BASE_URL}fonts/NotoSansTC-Regular.ttf`),
+      fetchAsBase64(`${import.meta.env.BASE_URL}fonts/NotoSansTC-Bold.ttf`),
     ]);
 
     doc.addFileToVFS('NotoSansTC-Regular.ttf', regB64);
@@ -154,7 +154,7 @@ export async function buildPdfReport(input: PdfReportInput): Promise<jsPDF> {
   // --- Header (Logo + Title) ---
   // Your repo shows: public/matta-logo.png
   try {
-    const logoB64 = await fetchAsBase64('/matta-logo.png');
+    const logoB64 = await fetchAsBase64(`${import.meta.env.BASE_URL}matta-logo.png`);
     doc.addImage(`data:image/png;base64,${logoB64}`, 'PNG', left, 12, 20, 20);
   } catch {
     // no logo -> continue
@@ -261,7 +261,6 @@ export async function downloadPdfReport(input: PdfReportInput) {
   const emailSafe = String(input.candidateEmail || 'unknown').replaceAll('@', '_').replaceAll('.', '_');
   doc.save(`BROWAVE_MATTA_${safeKey}_Result_${emailSafe}.pdf`);
 }
-
 
 
 
