@@ -21,7 +21,7 @@ export default function Admin() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function loadResults(adminPassword: string) {
+  async function loadResults(adminPassword: string): Promise<boolean> {
     setLoading(true);
     setErr('');
     try {
@@ -29,14 +29,15 @@ export default function Admin() {
         headers: { 'X-Admin-Password': adminPassword },
       });
       const data = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        sessionStorage.removeItem(PASSWORD_KEY);
-        setPassword('');
-      }
       if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
       setRows(data.rows ?? []);
+      return true;
     } catch (error) {
+      sessionStorage.removeItem(PASSWORD_KEY);
+      setPassword('');
+      setRows([]);
       setErr(error instanceof Error ? error.message : 'Could not load results.');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -46,14 +47,15 @@ export default function Admin() {
     if (password) void loadResults(password);
   }, []);
 
-  function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextPassword = passwordInput;
     if (!nextPassword) return;
-    sessionStorage.setItem(PASSWORD_KEY, nextPassword);
-    setPassword(nextPassword);
-    setPasswordInput('');
-    void loadResults(nextPassword);
+    if (await loadResults(nextPassword)) {
+      sessionStorage.setItem(PASSWORD_KEY, nextPassword);
+      setPassword(nextPassword);
+      setPasswordInput('');
+    }
   }
 
   function handleLogout() {
@@ -80,12 +82,13 @@ export default function Admin() {
             id="admin-password"
             type="password"
             autoComplete="current-password"
+            disabled={loading}
             value={passwordInput}
             onChange={(event) => setPasswordInput(event.target.value)}
             placeholder="Enter the admin password"
             className="min-w-0 flex-1 rounded-xl border border-white/15 bg-black/20 px-4 py-2 text-sm outline-none focus:border-emerald-400"
           />
-          <button className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400">Sign in</button>
+          <button disabled={loading} className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-50">Sign in</button>
         </form>
       )}
 

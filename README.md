@@ -32,7 +32,7 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 - `POST /api/results` — validates and saves one assessment submission.
 - `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires the configured password in the `X-Admin-Password` header.
 
-The admin password is held in browser `sessionStorage` only for that tab/session and is sent to the API over HTTPS. Use a unique password and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-password setup is intentionally simple; it is not an individual user-account system.
+The admin password is held in browser `sessionStorage` only for that tab/session and is sent to the API over HTTPS. Four incorrect password attempts from the same client address within an hour trigger a one-hour lockout. Lockout counters are kept in API memory and reset when the API process restarts. Use a unique password and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-password setup is intentionally simple; it is not an individual user-account system.
 
 ## Local database
 

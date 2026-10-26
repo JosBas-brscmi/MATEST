@@ -6,6 +6,10 @@ import { openDatabase } from './database.js';
 
 const port = Number(process.env.PORT || 3001);
 const { db, databasePath } = openDatabase();
+const ADMIN_MAX_FAILED_ATTEMPTS = 4;
+const ADMIN_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
+const ADMIN_LOCKOUT_MS = 60 * 60 * 1000;
+const failedAdminAttempts = new Map();
 
 const upsertCandidate = db.prepare(`
   INSERT INTO candidates (id, email, full_name, school, course, phone, created_at, updated_at)
@@ -64,6 +68,7 @@ const saveResult = db.transaction((payload) => {
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 'loopback');
 app.use(express.json({ limit: '64kb', strict: true }));
 
 app.get('/api/health', (_request, response) => {
@@ -87,11 +92,38 @@ app.post('/api/results', (request, response) => {
 });
 
 app.get('/api/admin/results', (request, response) => {
-  if (!isAuthorized(request.get('x-admin-password'))) {
-    return response.status(process.env.ADMIN_PASSWORD ? 401 : 503).json({
-      error: process.env.ADMIN_PASSWORD ? 'Admin password is incorrect.' : 'Admin access is disabled until ADMIN_PASSWORD is configured.',
+  const suppliedPassword = request.get('x-admin-password');
+  if (!process.env.ADMIN_PASSWORD) {
+    return response.status(503).json({
+      error: 'Admin access is disabled until ADMIN_PASSWORD is configured.',
     });
   }
+
+  const clientAddress = request.ip;
+  const lockout = getAdminLockout(clientAddress);
+  if (lockout) {
+    response.set('Retry-After', String(lockout.retryAfterSeconds));
+    return response.status(429).json({
+      error: `Too many failed password attempts. Try again in ${lockout.retryAfterSeconds} seconds.`,
+    });
+  }
+
+  if (!isAuthorized(suppliedPassword)) {
+    if (suppliedPassword) {
+      const failedAttempts = recordAdminPasswordFailure(clientAddress);
+      if (failedAttempts.lockout) {
+        response.set('Retry-After', String(failedAttempts.lockout.retryAfterSeconds));
+        return response.status(429).json({
+          error: `Too many failed password attempts. Try again in ${failedAttempts.lockout.retryAfterSeconds} seconds.`,
+        });
+      }
+      return response.status(401).json({
+        error: `Admin password is incorrect. ${ADMIN_MAX_FAILED_ATTEMPTS - failedAttempts.attempts} attempt(s) remaining before a one-hour lockout.`,
+      });
+    }
+    return response.status(401).json({ error: 'Admin password is required.' });
+  }
+  failedAdminAttempts.delete(clientAddress);
 
   const requestedLimit = Number.parseInt(String(request.query.limit || '500'), 10);
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 500;
@@ -174,6 +206,39 @@ function isAuthorized(supplied) {
   const expectedBuffer = Buffer.from(expected);
   const suppliedBuffer = Buffer.from(supplied);
   return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
+}
+
+function getAdminLockout(clientAddress, now = Date.now()) {
+  for (const [address, attempts] of failedAdminAttempts) {
+    const expiresAt = attempts.lockedUntil || attempts.windowStartedAt + ADMIN_ATTEMPT_WINDOW_MS;
+    if (expiresAt <= now) failedAdminAttempts.delete(address);
+  }
+  const attempts = failedAdminAttempts.get(clientAddress);
+  if (!attempts) return null;
+  if (attempts.lockedUntil) {
+    if (attempts.lockedUntil > now) {
+      return { retryAfterSeconds: Math.ceil((attempts.lockedUntil - now) / 1000) };
+    }
+  }
+  return null;
+}
+
+function recordAdminPasswordFailure(clientAddress, now = Date.now()) {
+  let attempts = failedAdminAttempts.get(clientAddress);
+  if (!attempts || now - attempts.windowStartedAt >= ADMIN_ATTEMPT_WINDOW_MS) {
+    attempts = { attempts: 0, windowStartedAt: now };
+  }
+  attempts.attempts += 1;
+  if (attempts.attempts >= ADMIN_MAX_FAILED_ATTEMPTS) {
+    attempts.lockedUntil = now + ADMIN_LOCKOUT_MS;
+  }
+  failedAdminAttempts.set(clientAddress, attempts);
+  return {
+    attempts: attempts.attempts,
+    lockout: attempts.lockedUntil
+      ? { retryAfterSeconds: Math.ceil((attempts.lockedUntil - now) / 1000) }
+      : null,
+  };
 }
 
 function createAptitudeReport(answers) {

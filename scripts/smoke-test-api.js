@@ -134,7 +134,23 @@ try {
   assert.ok(resultData.rows.some((row) => row.test_type === 'iq'));
   assert.ok(resultData.rows.some((row) => row.test_type === 'aptitude'));
 
-  console.log('API smoke test passed: health, validation, save, duplicate protection, and admin authorization.');
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const failedAttempt = await fetch(`${baseUrl}/api/admin/results`, {
+      headers: { 'X-Admin-Password': 'incorrect-password' },
+    });
+    assert.equal(failedAttempt.status, 401);
+  }
+  const fourthFailedAttempt = await fetch(`${baseUrl}/api/admin/results`, {
+    headers: { 'X-Admin-Password': 'incorrect-password' },
+  });
+  assert.equal(fourthFailedAttempt.status, 429);
+  assert.equal(fourthFailedAttempt.headers.get('retry-after'), '3600');
+  const correctPasswordWhileLocked = await fetch(`${baseUrl}/api/admin/results`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(correctPasswordWhileLocked.status, 429);
+
+  console.log('API smoke test passed: health, validation, save, duplicate protection, admin authentication, and lockout.');
 } finally {
   child.kill();
   await Promise.race([once(child, 'exit'), new Promise((resolve) => setTimeout(resolve, 2000))]);
