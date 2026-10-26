@@ -11,16 +11,16 @@ A self-hosted assessment application made of a static React/Vite frontend, a sep
 ## Local development
 
 1. Install dependencies with `npm install`.
-2. Copy `.env.example` to `.env` and replace `ADMIN_TOKEN` with a long random secret. For example, generate one with Node: `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+2. Copy `.env.example` to `.env` and replace `ADMIN_PASSWORD` with a unique, long random password. For example, generate one with Node: `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Keep this value on the API server; do not put it in frontend code.
 3. Run `npm run dev`. Vite serves the frontend and proxies `/api` to the local Node API. The API creates `database/trial.db` on first start.
-4. Open `/admin` and use the configured token to view saved results.
+4. Open `/admin` and use the configured password to view saved results.
 
-The production frontend is built with `npm run build` and emitted to `dist/`. Start the standalone API with `npm run start:api`. Set `DB_PATH` to a durable path outside the static document root in production. `ADMIN_TOKEN` must be configured; without it, admin access fails closed.
+The production frontend is built with `npm run build` and emitted to `dist/`. Start the standalone API with `npm run start:api`. Set `DB_PATH` to a durable path outside the static document root in production. `ADMIN_PASSWORD` must be configured in the API environment; without it, admin access fails closed.
 
 ## Production deployment
 
 1. Build the frontend and upload the complete contents of `dist/` to the nginx/Apache document root, including `index.html` and every file under `assets/`. For a site mounted under `/MATEST/`, set `VITE_BASE_PATH=/MATEST/` when building and configure the web server to strip `/MATEST` from static paths and map `/MATEST/api/` to the API's `/api/` routes. The sample nginx and Apache configurations support both root and `/MATEST/` deployments. Do not deploy only the HTML file; its hashed asset names change between builds.
-2. Install the Node dependencies on the API host and run `npm run start:api` under a process manager (systemd, NSSM, PM2, or equivalent). Configure `PORT`, `DB_PATH`, and `ADMIN_TOKEN` in the service environment.
+2. Install the Node dependencies on the API host and run `npm run start:api` under a process manager (systemd, NSSM, PM2, or equivalent). Configure `PORT`, `DB_PATH`, and `ADMIN_PASSWORD` in the service environment.
 3. Ensure the API service account can write to the database directory. Keep the SQLite database, `.env`, and backups outside the public web root. Back up the database regularly; with SQLite WAL mode enabled, stop the service or use SQLite's online backup API/CLI for consistent backups.
 4. Configure the web server to proxy `/api/` to `127.0.0.1:3001` before applying the single-page-app fallback. If submissions return 502, verify the API service is running and `http://127.0.0.1:3001/api/health` returns `{"ok":true}` on the web-server host. Example configurations are in [deploy/nginx.conf](deploy/nginx.conf) and [deploy/apache-vhost.conf](deploy/apache-vhost.conf). Update the document root and server name for your host and use HTTPS at the web-server layer for deployments handling personal data.
 
@@ -30,9 +30,9 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 
 - `GET /api/health` — local API health check.
 - `POST /api/results` — validates and saves one assessment submission.
-- `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires the configured password in the `X-Admin-Password` header.
 
-Admin credentials are held in browser `sessionStorage` only for that tab/session. Use a unique secret and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-token setup is intentionally simple; it is not an individual user-account system.
+The admin password is held in browser `sessionStorage` only for that tab/session and is sent to the API over HTTPS. Use a unique password and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-password setup is intentionally simple; it is not an individual user-account system.
 
 ## Local database
 

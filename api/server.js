@@ -87,9 +87,9 @@ app.post('/api/results', (request, response) => {
 });
 
 app.get('/api/admin/results', (request, response) => {
-  if (!isAuthorized(request.get('authorization'))) {
-    return response.status(process.env.ADMIN_TOKEN ? 401 : 503).json({
-      error: process.env.ADMIN_TOKEN ? 'Admin authentication required.' : 'Admin access is disabled until ADMIN_TOKEN is configured.',
+  if (!isAuthorized(request.get('x-admin-password'))) {
+    return response.status(process.env.ADMIN_PASSWORD ? 401 : 503).json({
+      error: process.env.ADMIN_PASSWORD ? 'Admin password is incorrect.' : 'Admin access is disabled until ADMIN_PASSWORD is configured.',
     });
   }
 
@@ -167,9 +167,9 @@ function validatePayload(payload) {
   return null;
 }
 
-function isAuthorized(header) {
-  const expected = process.env.ADMIN_TOKEN || '';
-  const supplied = typeof header === 'string' ? header.replace(/^Bearer\s+/i, '') : '';
+function isAuthorized(supplied) {
+  const expected = process.env.ADMIN_PASSWORD || '';
+  if (typeof supplied !== 'string') return false;
   if (!expected || !supplied) return false;
   const expectedBuffer = Buffer.from(expected);
   const suppliedBuffer = Buffer.from(supplied);

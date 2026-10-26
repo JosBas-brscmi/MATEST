@@ -80,9 +80,9 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         setErr('');
-        const tok = sessionStorage.getItem('matta_admin_token');
-        if (!tok) throw new Error('Sign in from the Results Table page first.');
-        const r = await fetch(`${API_BASE_URL}/admin/results`, { headers: { Authorization: `Bearer ${tok}` } });
+        const password = sessionStorage.getItem('matta_admin_password');
+        if (!password) throw new Error('Sign in from the admin page first.');
+        const r = await fetch(`${API_BASE_URL}/admin/results`, { headers: { 'X-Admin-Password': password } });
         if (!r.ok) throw new Error(await r.text());
         const j = await r.json();
         setRows(j.rows || []);

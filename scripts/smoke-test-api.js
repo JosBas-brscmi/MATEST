@@ -7,7 +7,7 @@ import { once } from 'node:events';
 import Database from 'better-sqlite3';
 
 const port = 31000 + Math.floor(Math.random() * 20000);
-const adminToken = 'smoke-test-local-admin-token';
+const adminPassword = 'smoke-test-local-admin-password';
 const temporaryDirectory = await mkdtemp(join(tmpdir(), 'matta-api-test-'));
 const databasePath = join(temporaryDirectory, 'test.sqlite');
 const child = spawn(process.execPath, ['api/server.js'], {
@@ -16,7 +16,7 @@ const child = spawn(process.execPath, ['api/server.js'], {
     ...process.env,
     PORT: String(port),
     DB_PATH: databasePath,
-    ADMIN_TOKEN: adminToken,
+    ADMIN_PASSWORD: adminPassword,
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -120,8 +120,12 @@ try {
 
   const unauthorized = await fetch(`${baseUrl}/api/admin/results`);
   assert.equal(unauthorized.status, 401);
+  const invalidPassword = await fetch(`${baseUrl}/api/admin/results`, {
+    headers: { 'X-Admin-Password': 'incorrect-password' },
+  });
+  assert.equal(invalidPassword.status, 401);
   const authorized = await fetch(`${baseUrl}/api/admin/results`, {
-    headers: { Authorization: `Bearer ${adminToken}` },
+    headers: { 'X-Admin-Password': adminPassword },
   });
   assert.equal(authorized.status, 200);
   const resultData = await authorized.json();

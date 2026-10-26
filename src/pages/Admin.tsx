@@ -12,53 +12,53 @@ type Row = {
   score_percent: number;
 };
 
-const TOKEN_KEY = 'matta_admin_token';
+const PASSWORD_KEY = 'matta_admin_password';
 
 export default function Admin() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) || '');
-  const [tokenInput, setTokenInput] = useState('');
+  const [password, setPassword] = useState(() => sessionStorage.getItem(PASSWORD_KEY) || '');
+  const [passwordInput, setPasswordInput] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function loadResults(adminToken: string) {
+  async function loadResults(adminPassword: string) {
     setLoading(true);
     setErr('');
     try {
       const response = await fetch(`${API_BASE_URL}/admin/results`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
+        headers: { 'X-Admin-Password': adminPassword },
       });
       const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        sessionStorage.removeItem(PASSWORD_KEY);
+        setPassword('');
+      }
       if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
       setRows(data.rows ?? []);
     } catch (error) {
       setErr(error instanceof Error ? error.message : 'Could not load results.');
-      if (error instanceof Error && error.message.includes('authentication')) {
-        sessionStorage.removeItem(TOKEN_KEY);
-        setToken('');
-      }
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (token) void loadResults(token);
+    if (password) void loadResults(password);
   }, []);
 
   function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextToken = tokenInput.trim();
-    if (!nextToken) return;
-    sessionStorage.setItem(TOKEN_KEY, nextToken);
-    setToken(nextToken);
-    setTokenInput('');
-    void loadResults(nextToken);
+    const nextPassword = passwordInput;
+    if (!nextPassword) return;
+    sessionStorage.setItem(PASSWORD_KEY, nextPassword);
+    setPassword(nextPassword);
+    setPasswordInput('');
+    void loadResults(nextPassword);
   }
 
   function handleLogout() {
-    sessionStorage.removeItem(TOKEN_KEY);
-    setToken('');
+    sessionStorage.removeItem(PASSWORD_KEY);
+    setPassword('');
     setRows([]);
     setErr('');
   }
@@ -73,16 +73,16 @@ export default function Admin() {
         <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
       </div>
 
-      {!token && (
+      {!password && (
         <form onSubmit={handleLogin} className="mt-6 flex max-w-lg gap-3 rounded-2xl border border-white/10 bg-panel/60 p-5">
-          <label className="sr-only" htmlFor="admin-token">Admin token</label>
+          <label className="sr-only" htmlFor="admin-password">Admin password</label>
           <input
-            id="admin-token"
+            id="admin-password"
             type="password"
             autoComplete="current-password"
-            value={tokenInput}
-            onChange={(event) => setTokenInput(event.target.value)}
-            placeholder="Enter the locally configured admin token"
+            value={passwordInput}
+            onChange={(event) => setPasswordInput(event.target.value)}
+            placeholder="Enter the admin password"
             className="min-w-0 flex-1 rounded-xl border border-white/15 bg-black/20 px-4 py-2 text-sm outline-none focus:border-emerald-400"
           />
           <button className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400">Sign in</button>
@@ -92,7 +92,7 @@ export default function Admin() {
       <div className="mt-6 rounded-2xl border border-white/10 bg-panel/60 p-5 shadow-glow">
         {loading && <div className="text-muted">Loading…</div>}
         {!loading && err && <div role="alert" className="text-sm text-danger">{err}</div>}
-        {!loading && token && !err && (
+        {!loading && password && !err && (
           <>
             <div className="mb-4 flex justify-end">
               <button onClick={handleLogout} className="text-sm text-muted underline hover:text-white">Sign out</button>
@@ -125,7 +125,7 @@ export default function Admin() {
           </>
         )}
       </div>
-      <p className="mt-4 text-xs text-muted">Configure ADMIN_TOKEN on the API host. The token is held in this browser session only.</p>
+      <p className="mt-4 text-xs text-muted">Configure ADMIN_PASSWORD on the API host. The password is held in this browser session only.</p>
     </div>
   );
 }
