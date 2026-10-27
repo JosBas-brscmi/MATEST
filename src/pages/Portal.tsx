@@ -213,28 +213,6 @@ export default function Portal() {
           </div>
         )}
 
-        {(customQuizzes.length > 0 || customQuizError) && (
-          <section className="mb-6">
-            <h2 className="mb-3 text-base font-bold text-white">Additional Quizzes</h2>
-            {customQuizError && <div role="alert" className="mb-3 rounded-xl border border-red-700/40 bg-red-950/30 p-3 text-sm text-red-300">{customQuizError}</div>}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {customQuizzes.map((quiz) => (
-                <div key={quiz.id} className="flex flex-col rounded-2xl border border-emerald-500/20 bg-slate-800/40 p-6 backdrop-blur">
-                  <div className="mb-2 text-lg font-bold text-emerald-300">{quiz.title}</div>
-                  <div className="mb-1 text-sm text-slate-400">Duration: {quiz.durationMinutes} min</div>
-                  <div className="mb-5 flex-1 text-sm text-slate-500">Questions: {quiz.questionCount}</div>
-                  <button
-                    onClick={() => nav(`/test/${encodeURIComponent(quiz.id)}`)}
-                    className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:scale-[1.02]"
-                  >
-                    Start Quiz
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Assessment cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {cards.filter(({ key }) => activeCoreTests.includes(key)).map(({ key, phase, title, colorClass, titleColor, sub, dur, items, btnColor }) => (
@@ -261,6 +239,28 @@ export default function Portal() {
             </div>
           ))}
         </div>
+
+        {(customQuizzes.length > 0 || customQuizError) && (
+          <section className="mb-6">
+            <h2 className="mb-3 text-base font-bold text-white">Additional Quizzes</h2>
+            {customQuizError && <div role="alert" className="mb-3 rounded-xl border border-red-700/40 bg-red-950/30 p-3 text-sm text-red-300">{customQuizError}</div>}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {customQuizzes.map((quiz) => (
+                <div key={quiz.id} className="flex flex-col rounded-2xl border border-emerald-500/20 bg-slate-800/40 p-6 backdrop-blur">
+                  <div className="mb-2 text-lg font-bold text-emerald-300">{quiz.title}</div>
+                  <div className="mb-1 text-sm text-slate-400">Duration: {quiz.durationMinutes} min</div>
+                  <div className="mb-5 flex-1 text-sm text-slate-500">Questions: {quiz.questionCount}</div>
+                  <button
+                    onClick={() => nav(`/test/${encodeURIComponent(quiz.id)}`)}
+                    className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:scale-[1.02]"
+                  >
+                    Start Quiz
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Results & Report */}
         <div className="rounded-2xl border border-slate-700/40 bg-slate-800/25 backdrop-blur p-6 mb-6">
