@@ -408,6 +408,47 @@ try {
     resultsDb.close();
   }
 
+  const unauthorizedResultDelete = await fetch(`${baseUrl}/api/admin/results/legacy-result`, {
+    method: 'DELETE',
+  });
+  assert.equal(unauthorizedResultDelete.status, 401);
+  const missingResultDelete = await fetch(`${baseUrl}/api/admin/results/missing-result`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(missingResultDelete.status, 404);
+  const deleteLegacyResult = await fetch(`${baseUrl}/api/admin/results/legacy-result`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(deleteLegacyResult.status, 200);
+  const afterLegacyDeleteDb = new Database(databasePath, { readonly: true, fileMustExist: true });
+  try {
+    assert.equal(afterLegacyDeleteDb.prepare('SELECT id FROM assessment_results WHERE id = ?').get('legacy-result'), undefined);
+    assert.equal(afterLegacyDeleteDb.prepare('SELECT id FROM candidates WHERE id = ?').get('legacy-candidate'), undefined);
+  } finally {
+    afterLegacyDeleteDb.close();
+  }
+
+  const smokeResultIds = resultData.rows
+    .filter((row) => row.candidate_email === 'smoke@example.test')
+    .map((row) => row.id);
+  for (const [index, resultId] of smokeResultIds.entries()) {
+    const deleteResponse = await fetch(`${baseUrl}/api/admin/results/${encodeURIComponent(resultId)}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Password': adminPassword },
+    });
+    assert.equal(deleteResponse.status, 200, await deleteResponse.text());
+    const candidateStillExists = new Database(databasePath, { readonly: true, fileMustExist: true });
+    try {
+      const candidate = candidateStillExists.prepare('SELECT id FROM candidates WHERE email = ?')
+        .get('smoke@example.test');
+      assert.equal(Boolean(candidate), index < smokeResultIds.length - 1);
+    } finally {
+      candidateStillExists.close();
+    }
+  }
+
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const failedAttempt = await fetch(`${baseUrl}/api/admin/results`, {
       headers: { 'X-Admin-Password': 'incorrect-password' },

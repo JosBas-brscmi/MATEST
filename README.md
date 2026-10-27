@@ -32,6 +32,7 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 - `GET /api/assessments` — lists built-in assessments currently available to candidates.
 - `POST /api/results` — validates and saves one assessment submission.
 - `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires the configured password in the `X-Admin-Password` header.
+- `DELETE /api/admin/results/:resultId` — permanently deletes one assessment result; removes the candidate profile only when no other results remain; requires admin password.
 - `GET /api/quizzes` and `GET /api/quizzes/:quizId` — list published custom quizzes and load a quiz for candidates.
 - `GET /api/admin/quizzes` and `GET /api/admin/quizzes/:quizId` — list built-in and custom quizzes and load an editable custom quiz; require admin password.
 - `POST /api/admin/quizzes` — creates and immediately publishes a custom quiz; requires admin password.

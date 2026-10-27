@@ -20,6 +20,8 @@ export default function Admin() {
   const [password, setPassword] = useState(() => sessionStorage.getItem(PASSWORD_KEY) || '');
   const [passwordInput, setPasswordInput] = useState('');
   const [err, setErr] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deletingId, setDeletingId] = useState('');
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -70,6 +72,35 @@ export default function Admin() {
     setAuthenticated(false);
   }
 
+  async function deleteResult(row: Row) {
+    const testName = row.custom_quiz_title || row.test_type;
+    if (!window.confirm(
+      `Permanently delete this ${testName} result for ${row.candidate_name} (${row.candidate_email})?\n\nThis cannot be undone.`,
+    )) return;
+
+    const adminPassword = sessionStorage.getItem(PASSWORD_KEY);
+    if (!adminPassword) {
+      setDeleteError('Your admin session has expired. Sign in again before deleting results.');
+      return;
+    }
+
+    setDeletingId(row.id);
+    setDeleteError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/results/${encodeURIComponent(row.id)}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Password': adminPassword },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Could not delete result (${response.status}).`);
+      setRows((current) => current.filter((item) => item.id !== row.id));
+    } catch (deleteRequestError) {
+      setDeleteError(deleteRequestError instanceof Error ? deleteRequestError.message : 'Could not delete result.');
+    } finally {
+      setDeletingId('');
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -115,6 +146,7 @@ export default function Admin() {
       <div className="mt-6 rounded-2xl border border-white/10 bg-panel/60 p-5 shadow-glow">
         {loading && <div className="text-muted">Loading…</div>}
         {!loading && err && <div role="alert" className="text-sm text-danger">{err}</div>}
+        {!loading && authenticated && deleteError && <div role="alert" className="mb-4 text-sm text-danger">{deleteError}</div>}
         {!loading && password && !err && (
           <>
             <div className="mb-4 flex justify-end">
@@ -129,6 +161,7 @@ export default function Admin() {
                     <th className="text-left py-2 pr-4">Test</th>
                     <th className="text-left py-2 pr-4">Score</th>
                     <th className="text-left py-2 pr-4">ID</th>
+                    <th className="text-left py-2 pr-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -139,6 +172,16 @@ export default function Admin() {
                       <td className="py-2 pr-4">{row.custom_quiz_title || row.test_type}</td>
                       <td className="py-2 pr-4">{row.score_percent}%</td>
                       <td className="py-2 pr-4 font-mono text-xs text-muted">{row.id}</td>
+                      <td className="py-2 pr-4">
+                        <button
+                          type="button"
+                          disabled={Boolean(deletingId)}
+                          onClick={() => void deleteResult(row)}
+                          className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                          {deletingId === row.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

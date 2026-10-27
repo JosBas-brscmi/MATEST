@@ -283,6 +283,28 @@ app.get('/api/admin/results', requireAdmin, (request, response) => {
   return response.json({ rows });
 });
 
+app.delete('/api/admin/results/:resultId', requireAdmin, (request, response) => {
+  const deleteResult = db.transaction((resultId) => {
+    const result = db.prepare('SELECT candidate_id FROM assessment_results WHERE id = ?').get(resultId);
+    if (!result) return false;
+
+    db.prepare('DELETE FROM assessment_results WHERE id = ?').run(resultId);
+    db.prepare(`
+      DELETE FROM candidates
+      WHERE id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM assessment_results WHERE candidate_id = ?
+        )
+    `).run(result.candidate_id, result.candidate_id);
+    return true;
+  });
+
+  if (!deleteResult(request.params.resultId)) {
+    return response.status(404).json({ error: 'Assessment result not found.' });
+  }
+  return response.json({ ok: true });
+});
+
 app.use((error, _request, response, _next) => {
   if (error?.type === 'entity.parse.failed') {
     return response.status(400).json({ error: 'Request body must contain valid JSON.' });
