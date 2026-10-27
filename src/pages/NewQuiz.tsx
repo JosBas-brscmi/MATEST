@@ -19,9 +19,16 @@ const QUESTION_TYPES: Array<{ value: QuestionType; label: string }> = [
   { value: 'custom', label: 'Custom type' },
 ];
 
+function createQuestionId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `question-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function makeQuestion(): Question {
   return {
-    id: crypto.randomUUID(),
+    id: createQuestionId(),
     type: 'logical_reasoning',
     categoryLabel: 'Pattern Recognition',
     title: '',
