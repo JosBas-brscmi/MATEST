@@ -69,6 +69,7 @@ export default function Portal() {
     const onVis = () => {
       if (document.visibilityState === 'visible') {
         setProgress(reconcileProgress(load(), activeCoreTests));
+        setCompletedCustomQuizIds(loadCompletedCustomQuizIds());
       }
     };
     document.addEventListener('visibilitychange', onVis);
@@ -102,6 +103,9 @@ export default function Portal() {
   const allDone = useMemo(() =>
     activeCoreTests.length > 0 && activeCoreTests.every((key) => progress[key] === 'completed'),
   [activeCoreTests, progress]);
+  const completedCustomQuizCount = customQuizzes.filter((quiz) =>
+    completedCustomQuizIds.includes(quiz.id),
+  ).length;
 
   function goTest(key: TestKey) {
     if (progress[key] === 'locked') {
@@ -304,6 +308,29 @@ export default function Portal() {
                   ? 'No core assessments are currently available.'
                   : `${activeCoreTests.filter((key) => progress[key] === 'completed').length} / ${activeCoreTests.length} completed · PDF available after all available tests`}
               </span>
+            </div>
+          )}
+
+          {customQuizzes.length > 0 && (
+            <div className="mt-4 rounded-xl border border-emerald-700/30 bg-emerald-900/10 p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-emerald-200">Custom Quiz Progress</span>
+                <span className="text-sm text-slate-400">
+                  {completedCustomQuizCount} / {customQuizzes.length} completed
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2" aria-label={`${completedCustomQuizCount} of ${customQuizzes.length} custom quizzes completed`}>
+                {customQuizzes.map((quiz) => {
+                  const completed = completedCustomQuizIds.includes(quiz.id);
+                  return (
+                    <span
+                      key={quiz.id}
+                      title={`${quiz.title}: ${completed ? 'Completed' : 'Not completed'}`}
+                      className={`h-3 w-3 rounded-full ${completed ? 'bg-emerald-400' : 'bg-slate-700'}`}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
