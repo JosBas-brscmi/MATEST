@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, TEST_SPECS, TestKey } from '../lib';
 import type { CustomQuizSummary } from '../lib';
-import { resetAllLocalState } from '../lib/resultsStore';
+import { loadCompletedCustomQuizIds, resetAllLocalState } from '../lib/resultsStore';
 
 type ProgressState = 'locked' | 'available' | 'completed';
 type ProgressMap = Record<TestKey, ProgressState>;
@@ -48,6 +48,7 @@ export default function Portal() {
   const nav = useNavigate();
   const [progress, setProgress] = useState<ProgressMap>(() => load());
   const [customQuizzes, setCustomQuizzes] = useState<CustomQuizSummary[]>([]);
+  const [completedCustomQuizIds, setCompletedCustomQuizIds] = useState<string[]>(() => loadCompletedCustomQuizIds());
   const [customQuizError, setCustomQuizError] = useState('');
   const [activeCoreTests, setActiveCoreTests] = useState<TestKey[]>([]);
   const [coreTestsError, setCoreTestsError] = useState('');
@@ -117,6 +118,7 @@ export default function Portal() {
   function resetTest() {
     resetAllLocalState();
     setProgress(reconcileProgress(load(), activeCoreTests));
+    setCompletedCustomQuizIds(loadCompletedCustomQuizIds());
   }
 
   const sp = TEST_SPECS;
@@ -251,10 +253,11 @@ export default function Portal() {
                   <div className="mb-1 text-sm text-slate-400">Duration: {quiz.durationMinutes} min</div>
                   <div className="mb-5 flex-1 text-sm text-slate-500">Questions: {quiz.questionCount}</div>
                   <button
+                    disabled={completedCustomQuizIds.includes(quiz.id)}
                     onClick={() => nav(`/test/${encodeURIComponent(quiz.id)}`)}
-                    className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:scale-[1.02]"
+                    className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:scale-[1.02] disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-500 disabled:hover:scale-100"
                   >
-                    Start Quiz
+                    {completedCustomQuizIds.includes(quiz.id) ? 'Completed' : 'Start Quiz'}
                   </button>
                 </div>
               ))}

@@ -6,6 +6,7 @@ export type ProgressMap = Record<TestKey, ProgressState>;
 
 export const PROGRESS_KEY = 'matta_test_progress_v1';
 export const RESULTS_ALL_KEY = 'matta_results_all_v1';
+export const COMPLETED_CUSTOM_QUIZZES_KEY = 'matta_completed_custom_quizzes_v1';
 
 export const ORDER: TestKey[] = ['iq', 'english', 'aptitude'];
 
@@ -37,6 +38,21 @@ export function saveProgress(p: ProgressMap) {
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
 }
 
+export function loadCompletedCustomQuizIds(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(COMPLETED_CUSTOM_QUIZZES_KEY) || '[]');
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function markCustomQuizCompleted(quizId: string) {
+  const completedIds = new Set(loadCompletedCustomQuizIds());
+  completedIds.add(quizId);
+  localStorage.setItem(COMPLETED_CUSTOM_QUIZZES_KEY, JSON.stringify([...completedIds]));
+}
+
 export function getNextKey(k: TestKey): TestKey | null {
   const i = ORDER.indexOf(k);
   if (i < 0) return null;
@@ -46,6 +62,7 @@ export function getNextKey(k: TestKey): TestKey | null {
 export function resetAllLocalState() {
   // progress
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(DEFAULT_PROGRESS));
+  localStorage.removeItem(COMPLETED_CUSTOM_QUIZZES_KEY);
 
   // total results cache
   localStorage.removeItem(RESULTS_ALL_KEY);
@@ -87,4 +104,3 @@ export function setResultForKey(testKey: TestKey, payload: AnyPayload) {
 export function isAllDone(p: ProgressMap): boolean {
   return p.iq === 'completed' && p.english === 'completed' && p.aptitude === 'completed';
 }
-

@@ -5,6 +5,7 @@ import { getRandomEnglishQuestions } from '../data/englishBank';
 import { getAptitudeQuestions } from '../data/aptitudeBank';
 import { API_BASE_URL, TEST_SPECS, scoreSimple, formatDuration } from '../lib';
 import type { CustomQuiz, Question } from '../lib';
+import { loadCompletedCustomQuizIds, markCustomQuizCompleted } from '../lib/resultsStore';
 
 // ── Progress helpers ──────────────────────────────────────────────────────────
 const STORAGE_KEY = 'matta_test_progress_v1';
@@ -66,6 +67,11 @@ export default function TestRunner() {
 
   useEffect(() => {
     if (!isCustomQuiz) return;
+    if (loadCompletedCustomQuizIds().includes(testKey)) {
+      setQuizLoadError('You have already completed this quiz. Use Refresh Status on the portal if you need to take it again.');
+      setQuizLoading(false);
+      return;
+    }
     fetch(`${API_BASE_URL}/quizzes/${encodeURIComponent(testKey)}`)
       .then(async (response) => {
         const data = await response.json();
@@ -177,7 +183,8 @@ export default function TestRunner() {
         sessionStorage.setItem(`lastResult:${testKey}`, JSON.stringify(resultPayload));
       } catch { /* ignore */ }
 
-      markCompleted(testKey);
+      if (isCustomQuiz && customQuiz) markCustomQuizCompleted(customQuiz.id);
+      else markCompleted(testKey);
       setSubmitted(true);
       navigate(`/results/${testKey}`);
     },
