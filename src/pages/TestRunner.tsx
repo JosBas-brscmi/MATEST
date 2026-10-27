@@ -47,11 +47,12 @@ export default function TestRunner() {
 
   const spec      = TEST_SPECS[testKey as keyof typeof TEST_SPECS] ?? TEST_SPECS.iq;
   const isCustomQuiz = !['iq', 'english', 'aptitude'].includes(testKey);
+  const isBuiltinAssessment = ['iq', 'english', 'aptitude'].includes(testKey);
   const isAptitude = testKey === 'aptitude';
 
   const [questions, setQuestions] = useState<Question[]>(() => loadQuestions(testKey));
   const [customQuiz, setCustomQuiz] = useState<CustomQuiz | null>(null);
-  const [quizLoading, setQuizLoading] = useState(isCustomQuiz);
+  const [quizLoading, setQuizLoading] = useState(isCustomQuiz || isBuiltinAssessment);
   const [quizLoadError, setQuizLoadError] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(spec.durationMinutes);
   const totalTime = durationMinutes * 60;
@@ -80,6 +81,21 @@ export default function TestRunner() {
       })
       .finally(() => setQuizLoading(false));
   }, [isCustomQuiz, testKey]);
+
+  useEffect(() => {
+    if (!isBuiltinAssessment) return;
+    fetch(`${API_BASE_URL}/assessments`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Could not check assessment availability (${response.status}).`);
+        const isAvailable = (data.assessments ?? []).some((assessment: { key: string }) => assessment.key === testKey);
+        if (!isAvailable) throw new Error('This assessment is not currently available.');
+      })
+      .catch((error: unknown) => {
+        setQuizLoadError(error instanceof Error ? error.message : 'Could not check assessment availability.');
+      })
+      .finally(() => setQuizLoading(false));
+  }, [isBuiltinAssessment, testKey]);
 
   useEffect(() => {
     if (quizLoading || quizLoadError) return;

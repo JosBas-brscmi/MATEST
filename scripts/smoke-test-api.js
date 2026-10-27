@@ -145,6 +145,11 @@ try {
   const health = await fetch(`${baseUrl}/api/health`);
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { ok: true });
+  const activeAssessmentsResponse = await fetch(`${baseUrl}/api/assessments`);
+  assert.equal(activeAssessmentsResponse.status, 200);
+  assert.deepEqual((await activeAssessmentsResponse.json()).assessments.map((assessment) => assessment.key), [
+    'iq', 'english', 'aptitude',
+  ]);
 
   const invalid = await fetch(`${baseUrl}/api/results`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
@@ -223,12 +228,42 @@ try {
     headers: { 'X-Admin-Password': adminPassword },
   });
   assert.equal(authorizedQuizList.status, 200);
-  assert.deepEqual((await authorizedQuizList.json()).quizzes, [{
+  const adminQuizList = (await authorizedQuizList.json()).quizzes;
+  assert.deepEqual(adminQuizList.slice(0, 3).map(({ id, kind, isActive }) => ({ id, kind, isActive })), [
+    { id: 'builtin-iq', kind: 'builtin', isActive: true },
+    { id: 'builtin-english', kind: 'builtin', isActive: true },
+    { id: 'builtin-aptitude', kind: 'builtin', isActive: true },
+  ]);
+  assert.deepEqual(adminQuizList[3], {
     id: customQuizId,
     title: customQuiz.title,
     durationMinutes: customQuiz.durationMinutes,
     questionCount: 2,
-  }]);
+    kind: 'custom',
+    isActive: true,
+  });
+
+  const hideBuiltinResponse = await fetch(`${baseUrl}/api/admin/assessments/iq`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify({ isActive: false }),
+  });
+  assert.equal(hideBuiltinResponse.status, 200);
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/assessments`)).json()).assessments.map((assessment) => assessment.key), [
+    'english', 'aptitude',
+  ]);
+  const unavailableSubmission = await fetch(`${baseUrl}/api/results`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, testType: 'iq' }),
+  });
+  assert.equal(unavailableSubmission.status, 400);
+  const restoreBuiltinResponse = await fetch(`${baseUrl}/api/admin/assessments/iq`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify({ isActive: true }),
+  });
+  assert.equal(restoreBuiltinResponse.status, 200);
 
   const adminQuizResponse = await fetch(`${baseUrl}/api/admin/quizzes/${customQuizId}`, {
     headers: { 'X-Admin-Password': adminPassword },
@@ -351,9 +386,12 @@ try {
   assert.equal(deleteQuizResponse.status, 200, await deleteQuizResponse.text());
   assert.deepEqual((await (await fetch(`${baseUrl}/api/quizzes`)).json()).quizzes, []);
   assert.equal((await fetch(`${baseUrl}/api/quizzes/${customQuizId}`)).status, 404);
-  assert.deepEqual((await (await fetch(`${baseUrl}/api/admin/quizzes`, {
+  const remainingAdminQuizzes = (await (await fetch(`${baseUrl}/api/admin/quizzes`, {
     headers: { 'X-Admin-Password': adminPassword },
-  })).json()).quizzes, []);
+  })).json()).quizzes;
+  assert.deepEqual(remainingAdminQuizzes.map((quiz) => quiz.id), [
+    'builtin-iq', 'builtin-english', 'builtin-aptitude',
+  ]);
 
   const resultsAfterQuizRemoval = await fetch(`${baseUrl}/api/admin/results`, {
     headers: { 'X-Admin-Password': adminPassword },

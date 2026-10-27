@@ -5,12 +5,17 @@ import type { CustomQuizSummary } from '../lib';
 
 const PASSWORD_KEY = 'matta_admin_password';
 
+interface ManagedQuiz extends CustomQuizSummary {
+  kind: 'builtin' | 'custom';
+  isActive: boolean;
+}
+
 interface ManageQuizzesProps {
   mode: 'remove' | 'modify';
 }
 
 export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
-  const [quizzes, setQuizzes] = useState<CustomQuizSummary[]>([]);
+  const [quizzes, setQuizzes] = useState<ManagedQuiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState('');
   const [error, setError] = useState('');
@@ -40,7 +45,44 @@ export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
     void loadQuizzes();
   }, []);
 
+  async function setBuiltinAvailability(quiz: ManagedQuiz, isActive: boolean) {
+    if (!isActive && !window.confirm(`Hide "${quiz.title}" from the candidate portal?`)) return;
+    const adminPassword = sessionStorage.getItem(PASSWORD_KEY);
+    if (!adminPassword) {
+      setError('Your admin session has expired. Return to the dashboard and sign in again.');
+      return;
+    }
+
+    setRemovingId(quiz.id);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/assessments/${encodeURIComponent(quiz.id.replace('builtin-', ''))}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Password': adminPassword,
+        },
+        body: JSON.stringify({ isActive }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Could not update assessment (${response.status}).`);
+      setQuizzes((current) => current.map((item) =>
+        item.id === quiz.id ? { ...item, isActive } : item,
+      ));
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Could not update assessment.');
+    } finally {
+      setRemovingId('');
+    }
+  }
+
   async function removeQuiz(quiz: CustomQuizSummary) {
+    const managedQuiz = quizzes.find((item) => item.id === quiz.id);
+    if (managedQuiz?.kind === 'builtin') {
+      await setBuiltinAvailability(managedQuiz, false);
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete "${quiz.title}" from the candidate portal?\n\nExisting submissions and their results will be preserved.`,
     );
@@ -51,7 +93,6 @@ export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
       setError('Your admin session has expired. Return to the dashboard and sign in again.');
       return;
     }
-
     setRemovingId(quiz.id);
     setError('');
     try {
@@ -80,8 +121,8 @@ export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
             <h1 className="mt-1 text-2xl font-bold">{isRemoving ? 'Remove Quiz' : 'Modify Quiz'}</h1>
             <p className="mt-2 text-sm text-gray-400">
               {isRemoving
-                ? 'Choose a quiz to remove it from the candidate portal. Existing submissions are kept.'
-                : 'Choose a quiz to edit its title, duration, questions, and answers.'}
+                ? 'Remove custom quizzes or hide built-in assessments from the candidate portal. Historical results are kept.'
+                : 'Edit custom quizzes. Built-in assessments are listed here so you can hide or restore them; their questions and scoring stay fixed.'}
             </p>
           </div>
           <Link to="/admin" className="rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5">Back</Link>
@@ -102,8 +143,25 @@ export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
                     <p className="mt-1 text-sm text-gray-400">
                       {quiz.questionCount} question{quiz.questionCount === 1 ? '' : 's'} · {quiz.durationMinutes} minutes
                     </p>
+                    <p className={`mt-1 text-xs ${quiz.isActive ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {quiz.kind === 'builtin' ? 'Built-in assessment · fixed questions and scoring' : 'Custom quiz'}
+                      {quiz.kind === 'builtin' ? ` · ${quiz.isActive ? 'Visible to candidates' : 'Hidden from candidates'}` : ''}
+                    </p>
                   </div>
-                  {isRemoving ? (
+                  {quiz.kind === 'builtin' ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(removingId)}
+                      onClick={() => void setBuiltinAvailability(quiz, !quiz.isActive)}
+                      className={`rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50 ${
+                        quiz.isActive
+                          ? 'border-amber-500/50 text-amber-300 hover:bg-amber-500/10'
+                          : 'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10'
+                      }`}
+                    >
+                      {removingId === quiz.id ? 'Saving…' : quiz.isActive ? 'Hide from portal' : 'Restore to portal'}
+                    </button>
+                  ) : isRemoving ? (
                     <button
                       type="button"
                       disabled={Boolean(removingId)}
@@ -123,6 +181,11 @@ export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
                 </li>
               ))}
             </ul>
+          )}
+          {!loading && !error && !quizzes.some((quiz) => quiz.kind === 'custom') && (
+            <p className="mt-5 border-t border-white/10 pt-4 text-xs text-gray-500">
+              No saved custom quizzes were found in the API database. If you expect older quizzes here, check that the API service is using the same persistent DB_PATH as before.
+            </p>
           )}
         </section>
       </main>

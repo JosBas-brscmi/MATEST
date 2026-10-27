@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS custom_quizzes (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS builtin_assessments (
+  test_key TEXT PRIMARY KEY CHECK (test_key IN ('iq', 'english', 'aptitude')),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+);
+
 CREATE TABLE IF NOT EXISTS assessment_results (
   id TEXT PRIMARY KEY,
   candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE RESTRICT,

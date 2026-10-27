@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadFinalPdf } from '../lib/pdfFinalReport';
+import { API_BASE_URL, TestKey } from '../lib';
+
+const TEST_LABELS: Record<TestKey, string> = {
+  iq: 'Intelligence Test',
+  english: 'English Assessment',
+  aptitude: 'Aptitude & Personality',
+};
 
 export default function ResultsFinal() {
   const nav = useNavigate();
   const [data, setData] = useState<any>(null);
   const [missing, setMissing] = useState<string[]>([]);
+  const [requiredTests, setRequiredTests] = useState<TestKey[]>(['iq', 'english', 'aptitude']);
+  const [availabilityError, setAvailabilityError] = useState('');
 
   useEffect(() => {
     // ── Read from sessionStorage with correct keys (set by TestRunner.tsx) ──
@@ -31,16 +40,21 @@ export default function ResultsFinal() {
     const english = readResult('english');
     const aptitude = readResult('aptitude');
 
-    // Track which are missing
-    const missingList: string[] = [];
-    if (!iq)       missingList.push('Intelligence Test');
-    if (!english)  missingList.push('English Assessment');
-    if (!aptitude) missingList.push('Aptitude & Personality');
-    setMissing(missingList);
-
     if (iq || english || aptitude) {
       setData({ iq, english, aptitude });
     }
+
+    fetch(`${API_BASE_URL}/assessments`)
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || `Could not load assessment availability (${response.status}).`);
+        const keys = (body.assessments ?? []).map((assessment: { key: TestKey }) => assessment.key);
+        setRequiredTests(keys);
+        setMissing(keys.filter((key: TestKey) => !({ iq, english, aptitude })[key]).map((key: TestKey) => TEST_LABELS[key]));
+      })
+      .catch((error: unknown) => {
+        setAvailabilityError(error instanceof Error ? error.message : 'Could not load assessment availability.');
+      });
   }, []);
 
   const startDownload = async () => {
@@ -56,7 +70,7 @@ export default function ResultsFinal() {
     }
   };
 
-  const allComplete = missing.length === 0;
+  const allComplete = requiredTests.length > 0 && missing.length === 0;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center px-4">
@@ -69,7 +83,7 @@ export default function ResultsFinal() {
 
         {allComplete ? (
           <p className="text-slate-400 text-sm mb-8">
-            All three assessments completed. Your final report is ready.
+            All available assessments completed. Your final report is ready.
           </p>
         ) : (
           <div className="mb-8">
@@ -78,19 +92,19 @@ export default function ResultsFinal() {
             </p>
             {missing.length > 0 && (
               <ul className="text-left text-sm space-y-1">
-                {['Intelligence Test', 'English Assessment', 'Aptitude & Personality'].map((name) => {
-                  const done = !missing.includes(name);
-                  return (
-                    <li key={name} className={`flex items-center gap-2 ${done ? 'text-green-400' : 'text-red-400'}`}>
-                      <span>{done ? '✓' : '✗'}</span>
-                      <span>{name}</span>
-                    </li>
-                  );
+                {requiredTests.map((key) => {
+                  const name = TEST_LABELS[key];
+                  const done = Boolean(data?.[key]);
+                  return <li key={key} className={`flex items-center gap-2 ${done ? 'text-green-400' : 'text-red-400'}`}>
+                    <span>{done ? '✓' : '✗'}</span>
+                    <span>{name}</span>
+                  </li>;
                 })}
               </ul>
             )}
           </div>
         )}
+        {availabilityError && <p role="alert" className="mb-4 text-sm text-red-300">{availabilityError}</p>}
 
         <div className="space-y-3">
           {/* Show download button if at least some data exists */}
@@ -124,4 +138,3 @@ export default function ResultsFinal() {
     </div>
   );
 }
-

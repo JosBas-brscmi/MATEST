@@ -9,6 +9,7 @@
     "dev:api": "node --watch api/server.js",
     "start:api": "node api/server.js",
     "build": "vite build",
+    "db:schema": "psql -U matta -d matta -h 127.0.0.1 -f schema.sql",
     "typecheck": "tsc --noEmit",
     "test:api": "node scripts/smoke-test-api.js",
     "lint": "eslint .",

@@ -10,6 +10,17 @@ const ADMIN_MAX_FAILED_ATTEMPTS = 4;
 const ADMIN_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
 const ADMIN_LOCKOUT_MS = 60 * 60 * 1000;
 const failedAdminAttempts = new Map();
+const BUILTIN_ASSESSMENTS = [
+  { key: 'iq', title: 'IQ Assessment', durationMinutes: 30, questionCount: 25 },
+  { key: 'english', title: 'English Assessment', durationMinutes: 25, questionCount: 25 },
+  { key: 'aptitude', title: 'Aptitude & Personality', durationMinutes: 18, questionCount: 30 },
+];
+
+const seedBuiltinAssessment = db.prepare(`
+  INSERT OR IGNORE INTO builtin_assessments (test_key, is_active)
+  VALUES (?, 1)
+`);
+for (const assessment of BUILTIN_ASSESSMENTS) seedBuiltinAssessment.run(assessment.key);
 
 const upsertCandidate = db.prepare(`
   INSERT INTO candidates (id, email, full_name, school, course, phone, created_at, updated_at)
@@ -76,6 +87,16 @@ app.get('/api/health', (_request, response) => {
   response.json({ ok: true });
 });
 
+app.get('/api/assessments', (_request, response) => {
+  const activeKeys = new Set(db.prepare(`
+    SELECT test_key FROM builtin_assessments WHERE is_active = 1
+  `).all().map((row) => row.test_key));
+  const assessments = BUILTIN_ASSESSMENTS
+    .filter((assessment) => activeKeys.has(assessment.key))
+    .map((assessment) => ({ ...assessment, id: `builtin-${assessment.key}` }));
+  return response.json({ assessments });
+});
+
 app.get('/api/quizzes', (_request, response) => {
   const quizzes = db.prepare(`
     SELECT id, title, duration_minutes, questions_json
@@ -111,7 +132,7 @@ app.get('/api/quizzes/:quizId', (request, response) => {
 });
 
 app.get('/api/admin/quizzes', requireAdmin, (_request, response) => {
-  const quizzes = db.prepare(`
+  const customQuizzes = db.prepare(`
     SELECT id, title, duration_minutes, questions_json
     FROM custom_quizzes
     ORDER BY created_at DESC
@@ -120,8 +141,33 @@ app.get('/api/admin/quizzes', requireAdmin, (_request, response) => {
     title: quiz.title,
     durationMinutes: quiz.duration_minutes,
     questionCount: JSON.parse(quiz.questions_json).length,
+    kind: 'custom',
+    isActive: true,
   }));
+  const activeBuiltinKeys = new Set(db.prepare(`
+    SELECT test_key FROM builtin_assessments WHERE is_active = 1
+  `).all().map((row) => row.test_key));
+  const builtinQuizzes = BUILTIN_ASSESSMENTS.map((assessment) => ({
+    id: `builtin-${assessment.key}`,
+    title: assessment.title,
+    durationMinutes: assessment.durationMinutes,
+    questionCount: assessment.questionCount,
+    kind: 'builtin',
+    isActive: activeBuiltinKeys.has(assessment.key),
+  }));
+  const quizzes = [...builtinQuizzes, ...customQuizzes];
   return response.json({ quizzes });
+});
+
+app.patch('/api/admin/assessments/:testKey', requireAdmin, (request, response) => {
+  const assessment = BUILTIN_ASSESSMENTS.find((item) => item.key === request.params.testKey);
+  if (!assessment) return response.status(404).json({ error: 'Built-in assessment not found.' });
+  if (typeof request.body?.isActive !== 'boolean') {
+    return response.status(400).json({ error: 'isActive must be a boolean.' });
+  }
+  db.prepare('UPDATE builtin_assessments SET is_active = ? WHERE test_key = ?')
+    .run(request.body.isActive ? 1 : 0, assessment.key);
+  return response.json({ ok: true, isActive: request.body.isActive });
 });
 
 app.get('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
@@ -174,6 +220,14 @@ app.delete('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
 app.post('/api/results', (request, response) => {
   const validationError = validatePayload(request.body);
   if (validationError) return response.status(400).json({ error: validationError });
+
+  if (['iq', 'english', 'aptitude'].includes(request.body.testType)) {
+    const assessment = db.prepare('SELECT is_active FROM builtin_assessments WHERE test_key = ?')
+      .get(request.body.testType);
+    if (!assessment?.is_active) {
+      return response.status(400).json({ error: 'This assessment is not currently available.' });
+    }
+  }
 
   if (request.body.testType === 'custom') {
     const quiz = db.prepare('SELECT questions_json FROM custom_quizzes WHERE id = ?').get(request.body.customQuizId);
