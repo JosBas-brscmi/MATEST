@@ -433,19 +433,50 @@ try {
   const smokeResultIds = resultData.rows
     .filter((row) => row.candidate_email === 'smoke@example.test')
     .map((row) => row.id);
-  for (const [index, resultId] of smokeResultIds.entries()) {
+  const invalidBulkDelete = await fetch(`${baseUrl}/api/admin/results`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify({ resultIds: [] }),
+  });
+  assert.equal(invalidBulkDelete.status, 400);
+  const unauthorizedBulkDelete = await fetch(`${baseUrl}/api/admin/results`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resultIds: smokeResultIds.slice(0, 2) }),
+  });
+  assert.equal(unauthorizedBulkDelete.status, 401);
+  const bulkDeleteResponse = await fetch(`${baseUrl}/api/admin/results`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify({ resultIds: smokeResultIds.slice(0, 2) }),
+  });
+  assert.equal(bulkDeleteResponse.status, 200);
+  assert.deepEqual(await bulkDeleteResponse.json(), { ok: true, deletedCount: 2 });
+  const afterBulkDeleteDb = new Database(databasePath, { readonly: true, fileMustExist: true });
+  try {
+    const remainingCandidate = afterBulkDeleteDb.prepare('SELECT id FROM candidates WHERE email = ?')
+      .get('smoke@example.test');
+    assert.ok(remainingCandidate);
+    for (const resultId of smokeResultIds.slice(0, 2)) {
+      assert.equal(afterBulkDeleteDb.prepare('SELECT id FROM assessment_results WHERE id = ?').get(resultId), undefined);
+    }
+  } finally {
+    afterBulkDeleteDb.close();
+  }
+
+  for (const resultId of smokeResultIds.slice(2)) {
     const deleteResponse = await fetch(`${baseUrl}/api/admin/results/${encodeURIComponent(resultId)}`, {
       method: 'DELETE',
       headers: { 'X-Admin-Password': adminPassword },
     });
     assert.equal(deleteResponse.status, 200, await deleteResponse.text());
-    const candidateStillExists = new Database(databasePath, { readonly: true, fileMustExist: true });
+    const afterSingleDeleteDb = new Database(databasePath, { readonly: true, fileMustExist: true });
     try {
-      const candidate = candidateStillExists.prepare('SELECT id FROM candidates WHERE email = ?')
+      const candidate = afterSingleDeleteDb.prepare('SELECT id FROM candidates WHERE email = ?')
         .get('smoke@example.test');
-      assert.equal(Boolean(candidate), index < smokeResultIds.length - 1);
+      assert.equal(Boolean(candidate), false);
     } finally {
-      candidateStillExists.close();
+      afterSingleDeleteDb.close();
     }
   }
 

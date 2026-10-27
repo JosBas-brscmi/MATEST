@@ -22,6 +22,8 @@ export default function Admin() {
   const [err, setErr] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -69,7 +71,73 @@ export default function Admin() {
     setPassword('');
     setRows([]);
     setErr('');
+    setSelectedIds(new Set());
     setAuthenticated(false);
+  }
+
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase();
+  const filteredRows = rows.filter((row) =>
+    `${row.candidate_name} ${row.candidate_email}`.toLocaleLowerCase().includes(normalizedSearch),
+  );
+  const allVisibleSelected = filteredRows.length > 0
+    && filteredRows.every((row) => selectedIds.has(row.id));
+
+  function toggleRowSelection(resultId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(resultId)) next.delete(resultId);
+      else next.add(resultId);
+      return next;
+    });
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) filteredRows.forEach((row) => next.delete(row.id));
+      else filteredRows.forEach((row) => next.add(row.id));
+      return next;
+    });
+  }
+
+  async function deleteSelectedResults() {
+    const resultIds = rows.filter((row) => selectedIds.has(row.id)).map((row) => row.id);
+    if (resultIds.length === 0) return;
+    if (!window.confirm(
+      `Permanently delete ${resultIds.length} selected result${resultIds.length === 1 ? '' : 's'}?\n\nThis cannot be undone.`,
+    )) return;
+
+    const adminPassword = sessionStorage.getItem(PASSWORD_KEY);
+    if (!adminPassword) {
+      setDeleteError('Your admin session has expired. Sign in again before deleting results.');
+      return;
+    }
+
+    setDeletingId('bulk');
+    setDeleteError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/results`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Password': adminPassword,
+        },
+        body: JSON.stringify({ resultIds }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Could not delete selected results (${response.status}).`);
+      const deletedIdSet = new Set(resultIds);
+      setRows((current) => current.filter((row) => !deletedIdSet.has(row.id)));
+      setSelectedIds((current) => {
+        const remaining = new Set(current);
+        resultIds.forEach((id) => remaining.delete(id));
+        return remaining;
+      });
+    } catch (deleteRequestError) {
+      setDeleteError(deleteRequestError instanceof Error ? deleteRequestError.message : 'Could not delete selected results.');
+    } finally {
+      setDeletingId('');
+    }
   }
 
   async function deleteResult(row: Row) {
@@ -94,6 +162,11 @@ export default function Admin() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Could not delete result (${response.status}).`);
       setRows((current) => current.filter((item) => item.id !== row.id));
+      setSelectedIds((current) => {
+        const remaining = new Set(current);
+        remaining.delete(row.id);
+        return remaining;
+      });
     } catch (deleteRequestError) {
       setDeleteError(deleteRequestError instanceof Error ? deleteRequestError.message : 'Could not delete result.');
     } finally {
@@ -149,6 +222,31 @@ export default function Admin() {
         {!loading && authenticated && deleteError && <div role="alert" className="mb-4 text-sm text-danger">{deleteError}</div>}
         {!loading && password && !err && (
           <>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <label className="min-w-60 flex-1">
+                <span className="sr-only">Search results by candidate name or email</span>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by candidate name or email"
+                  className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-2 text-sm outline-none focus:border-emerald-400"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void deleteSelectedResults()}
+                disabled={selectedIds.size === 0 || Boolean(deletingId)}
+                aria-label={`Permanently delete ${selectedIds.size} selected result${selectedIds.size === 1 ? '' : 's'}`}
+                title="Delete selected results"
+                className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18m-2 0-.9 14H5.9L5 6m4 0V4h6v2m-5 4v6m4-6v6" />
+                </svg>
+                {deletingId === 'bulk' ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
+              </button>
+            </div>
             <div className="mb-4 flex justify-end">
               <button onClick={handleLogout} className="text-sm text-muted underline hover:text-white">Sign out</button>
             </div>
@@ -156,6 +254,15 @@ export default function Admin() {
               <table className="w-full text-sm">
                 <thead className="text-muted">
                   <tr className="border-b border-white/10">
+                    <th className="py-2 pr-3">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all visible results"
+                        checked={allVisibleSelected}
+                        onChange={toggleVisibleSelection}
+                        disabled={filteredRows.length === 0 || Boolean(deletingId)}
+                      />
+                    </th>
                     <th className="text-left py-2 pr-4">Submitted</th>
                     <th className="text-left py-2 pr-4">Candidate</th>
                     <th className="text-left py-2 pr-4">Test</th>
@@ -165,8 +272,17 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {filteredRows.map((row) => (
                     <tr key={row.id} className="border-b border-white/5">
+                      <td className="py-2 pr-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select result for ${row.candidate_name} (${row.candidate_email})`}
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => toggleRowSelection(row.id)}
+                          disabled={Boolean(deletingId)}
+                        />
+                      </td>
                       <td className="py-2 pr-4">{new Date(row.submitted_at).toLocaleString()}</td>
                       <td className="py-2 pr-4">{row.candidate_name} ({row.candidate_email})</td>
                       <td className="py-2 pr-4">{row.custom_quiz_title || row.test_type}</td>
@@ -187,6 +303,9 @@ export default function Admin() {
                 </tbody>
               </table>
               {rows.length === 0 && <p className="py-6 text-center text-sm text-muted">No assessment results have been submitted.</p>}
+              {rows.length > 0 && filteredRows.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted">No results match “{searchQuery}”.</p>
+              )}
             </div>
           </>
         )}

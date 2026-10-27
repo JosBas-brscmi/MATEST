@@ -77,6 +77,24 @@ const saveResult = db.transaction((payload) => {
   });
   return resultId;
 });
+const deleteAssessmentResults = db.transaction((resultIds) => {
+  const deletedIds = [];
+  for (const resultId of resultIds) {
+    const result = db.prepare('SELECT candidate_id FROM assessment_results WHERE id = ?').get(resultId);
+    if (!result) continue;
+
+    db.prepare('DELETE FROM assessment_results WHERE id = ?').run(resultId);
+    db.prepare(`
+      DELETE FROM candidates
+      WHERE id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM assessment_results WHERE candidate_id = ?
+        )
+    `).run(result.candidate_id, result.candidate_id);
+    deletedIds.push(resultId);
+  }
+  return deletedIds;
+});
 
 const app = express();
 app.disable('x-powered-by');
@@ -284,25 +302,27 @@ app.get('/api/admin/results', requireAdmin, (request, response) => {
 });
 
 app.delete('/api/admin/results/:resultId', requireAdmin, (request, response) => {
-  const deleteResult = db.transaction((resultId) => {
-    const result = db.prepare('SELECT candidate_id FROM assessment_results WHERE id = ?').get(resultId);
-    if (!result) return false;
-
-    db.prepare('DELETE FROM assessment_results WHERE id = ?').run(resultId);
-    db.prepare(`
-      DELETE FROM candidates
-      WHERE id = ?
-        AND NOT EXISTS (
-          SELECT 1 FROM assessment_results WHERE candidate_id = ?
-        )
-    `).run(result.candidate_id, result.candidate_id);
-    return true;
-  });
-
-  if (!deleteResult(request.params.resultId)) {
+  const deletedIds = deleteAssessmentResults([request.params.resultId]);
+  if (deletedIds.length === 0) {
     return response.status(404).json({ error: 'Assessment result not found.' });
   }
   return response.json({ ok: true });
+});
+
+app.delete('/api/admin/results', requireAdmin, (request, response) => {
+  const { resultIds } = request.body ?? {};
+  if (
+    !Array.isArray(resultIds)
+    || resultIds.length < 1
+    || resultIds.length > 1000
+    || resultIds.some((id) => typeof id !== 'string' || !id || id.length > 100)
+    || new Set(resultIds).size !== resultIds.length
+  ) {
+    return response.status(400).json({ error: 'resultIds must contain 1 to 1,000 unique result IDs.' });
+  }
+
+  const deletedIds = deleteAssessmentResults(resultIds);
+  return response.json({ ok: true, deletedCount: deletedIds.length });
 });
 
 app.use((error, _request, response, _next) => {
