@@ -166,7 +166,7 @@ try {
     candidatePhone: '123456789',
     submittedAtISO: new Date().toISOString(),
     score: { correct: 4, total: 5, percent: 80 },
-    answers: { q1: 1, q2: 2 },
+    answers: { p01: 2, p02: 1 },
     autoSubmitted: false,
   };
   const submission = await fetch(`${baseUrl}/api/results`, {
@@ -180,7 +180,7 @@ try {
     testType: 'aptitude',
     submittedAtISO: new Date(Date.now() + 1000).toISOString(),
     score: { correct: 12, total: 15, percent: 80 },
-    answers: Object.fromEntries(Array.from({ length: 15 }, (_, index) => [`p${String(index + 1).padStart(2, '0')}`, 2])),
+    answers: { wa01: 1, wa02: 0 },
     autoSubmitted: true,
   };
   const aptitudeSubmission = await fetch(`${baseUrl}/api/results`, {
@@ -364,6 +364,36 @@ try {
 
   const unauthorized = await fetch(`${baseUrl}/api/admin/results`);
   assert.equal(unauthorized.status, 401);
+  const unauthorizedQuestionStats = await fetch(`${baseUrl}/api/admin/question-stats?testType=iq`);
+  assert.equal(unauthorizedQuestionStats.status, 401);
+  const invalidQuestionStats = await fetch(`${baseUrl}/api/admin/question-stats?testType=custom`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(invalidQuestionStats.status, 400);
+  const iqQuestionStatsResponse = await fetch(`${baseUrl}/api/admin/question-stats?testType=iq`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(iqQuestionStatsResponse.status, 200);
+  const iqQuestionStats = await iqQuestionStatsResponse.json();
+  assert.equal(iqQuestionStats.testType, 'iq');
+  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p01').responses, 1);
+  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p01').correct, 1);
+  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p01').accuracyPercent, 100);
+  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p02').incorrect, 1);
+  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p02').accuracyPercent, 0);
+  const englishQuestionStatsResponse = await fetch(`${baseUrl}/api/admin/question-stats?testType=english`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(englishQuestionStatsResponse.status, 200);
+  const englishQuestionStats = await englishQuestionStatsResponse.json();
+  assert.ok(englishQuestionStats.questions.some((question) => question.id === 'g01' && question.category === 'Grammar'));
+  const aptitudeQuestionStatsResponse = await fetch(`${baseUrl}/api/admin/question-stats?testType=aptitude`, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(aptitudeQuestionStatsResponse.status, 200);
+  const aptitudeQuestionStats = await aptitudeQuestionStatsResponse.json();
+  assert.ok(aptitudeQuestionStats.questions.some((question) => question.id === 'wa01'));
+  assert.ok(aptitudeQuestionStats.questions.every((question) => question.id.startsWith('wa')));
   const invalidPassword = await fetch(`${baseUrl}/api/admin/results`, {
     headers: { 'X-Admin-Password': 'incorrect-password' },
   });

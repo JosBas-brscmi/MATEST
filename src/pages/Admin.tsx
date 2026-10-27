@@ -193,6 +193,9 @@ export default function Admin() {
               <Link to="/admin/quizzes/modify" className="rounded-xl border border-sky-500/40 px-4 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/10">
                 Modify Quiz
               </Link>
+              <Link to="/admin/statistics" className="rounded-xl border border-violet-500/40 px-4 py-2 text-sm font-semibold text-violet-300 hover:bg-violet-500/10">
+                Question Statistics
+              </Link>
             </>
           )}
           <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>

@@ -32,6 +32,7 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 - `GET /api/assessments` — lists built-in assessments currently available to candidates.
 - `POST /api/results` — validates and saves one assessment submission.
 - `GET /api/admin/results?limit=500` — returns up to 1,000 latest rows; requires the configured password in the `X-Admin-Password` header.
+- `GET /api/admin/question-stats?testType=iq|english|aptitude` — returns per-question answer counts and accuracy for built-in assessments; requires the admin password.
 - `DELETE /api/admin/results/:resultId` — permanently deletes one assessment result; removes the candidate profile only when no other results remain; requires admin password.
 - `DELETE /api/admin/results` with `{ "resultIds": ["..."] }` — permanently deletes up to 1,000 selected results in one transaction; requires admin password.
 - `GET /api/quizzes` and `GET /api/quizzes/:quizId` — list published custom quizzes and load a quiz for candidates.
@@ -43,6 +44,8 @@ The API listens only on `127.0.0.1` by default and should not be exposed directl
 The admin password is held in browser `sessionStorage` only for that tab/session and is sent to the API over HTTPS. Four incorrect password attempts from the same client address within an hour trigger a one-hour lockout. Lockout counters are kept in API memory and reset when the API process restarts. Use a unique password and restrict access to the admin page at the network/web-server layer if stronger access controls are needed. This shared-password setup is intentionally simple; it is not an individual user-account system.
 
 From the admin dashboard, create, remove, or modify quizzes. Custom quiz removal requires confirmation, unpublishes it from the candidate portal, and preserves historical submissions and their quiz title. Editing changes the quiz candidates see going forward. Built-in IQ, English, and Aptitude assessments also appear in the Remove and Modify lists; they can be hidden from or restored to the candidate portal, but their question banks and scoring remain fixed. Hidden built-in assessments are skipped in the candidate sequence. Custom quiz completion is remembered in the candidate browser, disabling its Start button until Refresh Status is used or a new candidate registers. Custom quizzes support a duration, titled question cards, optional titled passages, per-question container colors, and question type labels. Scored questions use four A–D choices and one correct answer. Likert questions use the existing five-point agreement scale and do not count toward the score. New quizzes appear independently in the candidate portal as soon as they are published.
+
+The admin Question Statistics page compares recorded built-in-test answers with the current question bank. It shows answer counts and accuracy by stable question ID, excludes unscored Aptitude personality questions, and marks results with fewer than five answers as a small sample. Only answered questions are included in each denominator. Question text and answer keys are not versioned alongside historic results, so changing a bank item or its answer key can affect the interpretation of earlier submissions.
 
 ## Local database
 

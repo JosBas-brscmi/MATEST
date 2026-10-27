@@ -8,6 +8,7 @@ const TestRunner = lazy(() => import('./TestRunner'));
 const Results = lazy(() => import('./Results'));
 const ResultsFinal = lazy(() => import('./ResultsFinal'));
 const Admin = lazy(() => import('./Admin'));
+const QuestionStats = lazy(() => import('./QuestionStats'));
 const NewQuiz = lazy(() => import('./NewQuiz'));
 const ManageQuizzes = lazy(() => import('./ManageQuizzes'));
 
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/results/:testKey" element={<Results />} />
 
       <Route path="/admin" element={<Admin />} />
+      <Route path="/admin/statistics" element={<QuestionStats />} />
       <Route path="/admin/quizzes/new" element={<NewQuiz />} />
       <Route path="/admin/quizzes/remove" element={<ManageQuizzes mode="remove" />} />
       <Route path="/admin/quizzes/modify" element={<ManageQuizzes mode="modify" />} />

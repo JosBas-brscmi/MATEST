@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import { openDatabase } from './database.js';
+import { getQuestionStatistics } from './questionStats.js';
 
 const port = Number(process.env.PORT || 3001);
 const { db, databasePath } = openDatabase();
@@ -299,6 +300,14 @@ app.get('/api/admin/results', requireAdmin, (request, response) => {
     LIMIT ?
   `).all(limit);
   return response.json({ rows });
+});
+
+app.get('/api/admin/question-stats', requireAdmin, (request, response) => {
+  const { testType } = request.query;
+  if (!['iq', 'english', 'aptitude'].includes(testType)) {
+    return response.status(400).json({ error: 'testType must be iq, english, or aptitude.' });
+  }
+  return response.json(getQuestionStatistics(db, testType));
 });
 
 app.delete('/api/admin/results/:resultId', requireAdmin, (request, response) => {
