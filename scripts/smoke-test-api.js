@@ -212,6 +212,14 @@ try {
         choices: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'],
         answerIndex: -1,
       },
+      {
+        id: 'custom-q3',
+        type: 'grammar',
+        categoryLabel: 'Grammar',
+        prompt: 'Choose the correct word.',
+        choices: ['First', 'Second', 'Third', 'Fourth'],
+        answerIndex: 2,
+      },
     ],
   };
   const createQuiz = await fetch(`${baseUrl}/api/admin/quizzes`, {
@@ -238,7 +246,7 @@ try {
     id: customQuizId,
     title: customQuiz.title,
     durationMinutes: customQuiz.durationMinutes,
-    questionCount: 2,
+    questionCount: 3,
     kind: 'custom',
     isActive: true,
   });
@@ -284,8 +292,33 @@ try {
     id: customQuizId,
     title: updatedQuiz.title,
     durationMinutes: updatedQuiz.durationMinutes,
-    questionCount: 2,
+    questionCount: 3,
   }]);
+
+  const laterQuizResponse = await fetch(`${baseUrl}/api/admin/quizzes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify({ ...customQuiz, title: 'Later Custom Smoke Quiz' }),
+  });
+  const laterQuiz = await laterQuizResponse.json();
+  assert.equal(laterQuizResponse.status, 201, JSON.stringify(laterQuiz));
+  const orderingDb = new Database(databasePath);
+  try {
+    orderingDb.prepare('UPDATE custom_quizzes SET created_at = ? WHERE id = ?')
+      .run('2020-01-01T00:00:00.000Z', customQuizId);
+    orderingDb.prepare('UPDATE custom_quizzes SET created_at = ? WHERE id = ?')
+      .run('2021-01-01T00:00:00.000Z', laterQuiz.id);
+  } finally {
+    orderingDb.close();
+  }
+  const orderedQuizzes = await fetch(`${baseUrl}/api/quizzes`);
+  assert.deepEqual((await orderedQuizzes.json()).quizzes.map(({ id }) => id), [customQuizId, laterQuiz.id]);
+  const deleteLaterQuiz = await fetch(`${baseUrl}/api/admin/quizzes/${laterQuiz.id}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(deleteLaterQuiz.status, 200, await deleteLaterQuiz.text());
+
   const fetchedQuiz = await fetch(`${baseUrl}/api/quizzes/${customQuizId}`);
   const fetchedQuizBody = await fetchedQuiz.json();
   assert.deepEqual(fetchedQuizBody.questions, customQuiz.questions.map(({ answerIndex: _answerIndex, ...question }) => question));
@@ -299,7 +332,7 @@ try {
     testTitle: updatedQuiz.title,
     submittedAtISO: new Date(Date.now() + 2000).toISOString(),
     score: { correct: 0, total: 1, percent: 0 },
-    answers: { 'custom-q1': 0, 'custom-q2': 4 },
+    answers: { 'custom-q1': 0, 'custom-q2': 4, 'custom-q3': 2 },
   };
   const customSubmission = await fetch(`${baseUrl}/api/results`, {
     method: 'POST',
@@ -308,7 +341,40 @@ try {
   });
   const customSubmissionBody = await customSubmission.json();
   assert.equal(customSubmission.status, 201, JSON.stringify(customSubmissionBody));
-  assert.deepEqual(customSubmissionBody.score, { correct: 1, total: 1, percent: 100 });
+  assert.deepEqual(customSubmissionBody.score, { correct: 2, total: 2, percent: 100 });
+
+  const customQuestionStatsUrl = `${baseUrl}/api/admin/question-stats?testType=custom&quizId=${encodeURIComponent(customQuizId)}`;
+  const initialCustomStatsResponse = await fetch(customQuestionStatsUrl, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(initialCustomStatsResponse.status, 200);
+  const initialCustomStats = await initialCustomStatsResponse.json();
+  assert.equal(initialCustomStats.quizTitle, updatedQuiz.title);
+  assert.equal(initialCustomStats.submissionCount, 1);
+  assert.equal(initialCustomStats.questions.length, 2);
+  assert.equal(initialCustomStats.questions.find((question) => question.id === 'custom-q1').responses, 1);
+  assert.equal(initialCustomStats.questions.find((question) => question.id === 'custom-q3').correct, 1);
+
+  const editedQuiz = {
+    ...updatedQuiz,
+    questions: updatedQuiz.questions.map((question) =>
+      question.id === 'custom-q1' ? { ...question, prompt: 'Updated question prompt.' } : question,
+    ),
+  };
+  const editQuizResponse = await fetch(`${baseUrl}/api/admin/quizzes/${customQuizId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify(editedQuiz),
+  });
+  assert.equal(editQuizResponse.status, 200, await editQuizResponse.text());
+  const resetCustomStatsResponse = await fetch(customQuestionStatsUrl, {
+    headers: { 'X-Admin-Password': adminPassword },
+  });
+  assert.equal(resetCustomStatsResponse.status, 200);
+  const resetCustomStats = await resetCustomStatsResponse.json();
+  assert.equal(resetCustomStats.questions.find((question) => question.id === 'custom-q1').responses, 0);
+  assert.equal(resetCustomStats.questions.find((question) => question.id === 'custom-q3').responses, 1);
+  assert.equal(resetCustomStats.questions.find((question) => question.id === 'custom-q3').correct, 1);
 
   const db = new Database(databasePath, { readonly: true, fileMustExist: true });
   try {
@@ -416,6 +482,9 @@ try {
   assert.equal(deleteQuizResponse.status, 200, await deleteQuizResponse.text());
   assert.deepEqual((await (await fetch(`${baseUrl}/api/quizzes`)).json()).quizzes, []);
   assert.equal((await fetch(`${baseUrl}/api/quizzes/${customQuizId}`)).status, 404);
+  assert.equal((await fetch(customQuestionStatsUrl, {
+    headers: { 'X-Admin-Password': adminPassword },
+  })).status, 404);
   const remainingAdminQuizzes = (await (await fetch(`${baseUrl}/api/admin/quizzes`, {
     headers: { 'X-Admin-Password': adminPassword },
   })).json()).quizzes;
@@ -434,6 +503,10 @@ try {
     const preservedQuizRecord = resultsDb.prepare('SELECT custom_quiz_id FROM assessment_results WHERE test_key = ?')
       .get(customResultPayload.testKey);
     assert.equal(preservedQuizRecord.custom_quiz_id, null);
+    assert.equal(resultsDb.prepare('SELECT quiz_id FROM custom_quiz_question_stats WHERE quiz_id = ?')
+      .get(customQuizId), undefined);
+    assert.ok(resultsDb.prepare('SELECT id FROM assessment_results WHERE test_key = ?')
+      .get(customResultPayload.testKey));
   } finally {
     resultsDb.close();
   }

@@ -15,7 +15,24 @@ export function openDatabase() {
   const schema = readFileSync(resolve(projectRoot, 'database/schema.sql'), 'utf8');
   db.exec(schema);
   migrateCustomQuizResults(db);
+  migrateCustomQuizQuestionStats(db);
   return { db, databasePath };
+}
+
+function migrateCustomQuizQuestionStats(db) {
+  const insertQuestionStats = db.prepare(`
+    INSERT OR IGNORE INTO custom_quiz_question_stats (quiz_id, question_id, stats_since)
+    VALUES (?, ?, ?)
+  `);
+  const insertExistingQuestions = db.transaction(() => {
+    const quizzes = db.prepare('SELECT id, questions_json, created_at FROM custom_quizzes').all();
+    for (const quiz of quizzes) {
+      for (const question of JSON.parse(quiz.questions_json)) {
+        insertQuestionStats.run(quiz.id, question.id, quiz.created_at);
+      }
+    }
+  });
+  insertExistingQuestions();
 }
 
 function migrateCustomQuizResults(db) {

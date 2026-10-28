@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import express from 'express';
 import { openDatabase } from './database.js';
 import { getQuestionStatistics } from './questionStats.js';
@@ -78,6 +79,58 @@ const saveResult = db.transaction((payload) => {
   });
   return resultId;
 });
+const createCustomQuiz = db.transaction((id, title, durationMinutes, questions, createdAt) => {
+  db.prepare(`
+    INSERT INTO custom_quizzes (id, title, duration_minutes, questions_json, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, title, durationMinutes, JSON.stringify(questions), createdAt);
+  const insertQuestionStats = db.prepare(`
+    INSERT INTO custom_quiz_question_stats (quiz_id, question_id, stats_since)
+    VALUES (?, ?, ?)
+  `);
+  for (const question of questions) insertQuestionStats.run(id, question.id, createdAt);
+});
+const updateCustomQuiz = db.transaction((quizId, title, durationMinutes, questions) => {
+  const existingQuiz = db.prepare('SELECT questions_json FROM custom_quizzes WHERE id = ?').get(quizId);
+  if (!existingQuiz) return false;
+
+  const previousQuestions = JSON.parse(existingQuiz.questions_json);
+  const previousQuestionById = new Map(previousQuestions.map((question) => [question.id, question]));
+  const nextQuestionIds = new Set(questions.map((question) => question.id));
+  const updatedAt = new Date().toISOString();
+  const latestResult = db.prepare(`
+    SELECT MAX(created_at) AS created_at
+    FROM assessment_results
+    WHERE custom_quiz_id = ?
+  `).get(quizId).created_at;
+  const latestResultTimestamp = latestResult ? Date.parse(latestResult) : NaN;
+  const statsSince = Number.isFinite(latestResultTimestamp)
+    ? new Date(Math.max(Date.now(), latestResultTimestamp + 1)).toISOString()
+    : updatedAt;
+  db.prepare(`
+    UPDATE custom_quizzes
+    SET title = ?, duration_minutes = ?, questions_json = ?
+    WHERE id = ?
+  `).run(title, durationMinutes, JSON.stringify(questions), quizId);
+
+  const upsertQuestionStats = db.prepare(`
+    INSERT INTO custom_quiz_question_stats (quiz_id, question_id, stats_since)
+    VALUES (?, ?, ?)
+    ON CONFLICT(quiz_id, question_id) DO UPDATE SET stats_since = excluded.stats_since
+  `);
+  for (const question of questions) {
+    if (!isDeepStrictEqual(previousQuestionById.get(question.id), question)) {
+      upsertQuestionStats.run(quizId, question.id, statsSince);
+    }
+  }
+  const deleteQuestionStats = db.prepare(`
+    DELETE FROM custom_quiz_question_stats WHERE quiz_id = ? AND question_id = ?
+  `);
+  for (const question of previousQuestions) {
+    if (!nextQuestionIds.has(question.id)) deleteQuestionStats.run(quizId, question.id);
+  }
+  return true;
+});
 const deleteAssessmentResults = db.transaction((resultIds) => {
   const deletedIds = [];
   for (const resultId of resultIds) {
@@ -120,7 +173,7 @@ app.get('/api/quizzes', (_request, response) => {
   const quizzes = db.prepare(`
     SELECT id, title, duration_minutes, questions_json
     FROM custom_quizzes
-    ORDER BY created_at DESC
+    ORDER BY created_at ASC
   `).all().map((quiz) => ({
     id: quiz.id,
     title: quiz.title,
@@ -210,10 +263,7 @@ app.post('/api/admin/quizzes', requireAdmin, (request, response) => {
 
   const id = randomUUID();
   const createdAt = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO custom_quizzes (id, title, duration_minutes, questions_json, created_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, request.body.title.trim(), request.body.durationMinutes, JSON.stringify(request.body.questions), createdAt);
+  createCustomQuiz(id, request.body.title.trim(), request.body.durationMinutes, request.body.questions, createdAt);
   return response.status(201).json({ id });
 });
 
@@ -221,12 +271,13 @@ app.put('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
   const validationError = validateCustomQuiz(request.body);
   if (validationError) return response.status(400).json({ error: validationError });
 
-  const result = db.prepare(`
-    UPDATE custom_quizzes
-    SET title = ?, duration_minutes = ?, questions_json = ?
-    WHERE id = ?
-  `).run(request.body.title.trim(), request.body.durationMinutes, JSON.stringify(request.body.questions), request.params.quizId);
-  if (!result.changes) return response.status(404).json({ error: 'Quiz not found.' });
+  const updated = updateCustomQuiz(
+    request.params.quizId,
+    request.body.title.trim(),
+    request.body.durationMinutes,
+    request.body.questions,
+  );
+  if (!updated) return response.status(404).json({ error: 'Quiz not found.' });
   return response.json({ ok: true });
 });
 
@@ -303,9 +354,17 @@ app.get('/api/admin/results', requireAdmin, (request, response) => {
 });
 
 app.get('/api/admin/question-stats', requireAdmin, (request, response) => {
-  const { testType } = request.query;
+  const { testType, quizId } = request.query;
+  if (testType === 'custom') {
+    if (typeof quizId !== 'string' || !quizId) {
+      return response.status(400).json({ error: 'quizId is required for custom question statistics.' });
+    }
+    const quiz = db.prepare('SELECT id, title, questions_json FROM custom_quizzes WHERE id = ?').get(quizId);
+    if (!quiz) return response.status(404).json({ error: 'Custom quiz not found.' });
+    return response.json(getQuestionStatistics(db, testType, quiz));
+  }
   if (!['iq', 'english', 'aptitude'].includes(testType)) {
-    return response.status(400).json({ error: 'testType must be iq, english, or aptitude.' });
+    return response.status(400).json({ error: 'testType must be iq, english, aptitude, or custom.' });
   }
   return response.json(getQuestionStatistics(db, testType));
 });

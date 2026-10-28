@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS custom_quizzes (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS custom_quiz_question_stats (
+  quiz_id TEXT NOT NULL REFERENCES custom_quizzes(id) ON DELETE CASCADE,
+  question_id TEXT NOT NULL,
+  stats_since TEXT NOT NULL,
+  PRIMARY KEY (quiz_id, question_id)
+);
+
 CREATE TABLE IF NOT EXISTS builtin_assessments (
   test_key TEXT PRIMARY KEY CHECK (test_key IN ('iq', 'english', 'aptitude')),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))

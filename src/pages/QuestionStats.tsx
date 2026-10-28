@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../lib';
 
-type TestType = 'iq' | 'english' | 'aptitude';
+type TestType = 'iq' | 'english' | 'aptitude' | 'custom';
+type QuizOption = { id: string; title: string; kind: 'builtin' | 'custom' };
 
 type QuestionStatistic = {
   id: string;
@@ -18,6 +19,8 @@ type QuestionStatistic = {
 
 type Statistics = {
   testType: TestType;
+  quizId?: string;
+  quizTitle?: string;
   submissionCount: number;
   questions: QuestionStatistic[];
 };
@@ -27,11 +30,14 @@ const TEST_LABELS: Record<TestType, string> = {
   iq: 'IQ Assessment',
   english: 'English Assessment',
   aptitude: 'Work Aptitude',
+  custom: 'Custom Quiz',
 };
 const MINIMUM_SAMPLE_SIZE = 5;
 
 export default function QuestionStats() {
   const [testType, setTestType] = useState<TestType>('iq');
+  const [customQuizzes, setCustomQuizzes] = useState<QuizOption[]>([]);
+  const [customQuizId, setCustomQuizId] = useState('');
   const [password, setPassword] = useState(() => sessionStorage.getItem(PASSWORD_KEY) || '');
   const [passwordInput, setPasswordInput] = useState('');
   const [statistics, setStatistics] = useState<Statistics | null>(null);
@@ -39,14 +45,26 @@ export default function QuestionStats() {
   const [authenticated, setAuthenticated] = useState(false);
   const [error, setError] = useState('');
 
-  async function loadStatistics(adminPassword: string, selectedTest: TestType): Promise<boolean> {
+  async function loadStatistics(
+    adminPassword: string,
+    selectedTest: TestType,
+    selectedQuizId: string,
+  ): Promise<boolean> {
+    if (selectedTest === 'custom' && !selectedQuizId) {
+      setStatistics(null);
+      setError('');
+      setLoading(false);
+      return false;
+    }
     setLoading(true);
     setStatistics(null);
     setError('');
     let responseStatus = 0;
     try {
       const response = await fetch(
-        `${API_BASE_URL}/admin/question-stats?testType=${encodeURIComponent(selectedTest)}`,
+        `${API_BASE_URL}/admin/question-stats?testType=${encodeURIComponent(selectedTest)}${
+          selectedTest === 'custom' ? `&quizId=${encodeURIComponent(selectedQuizId)}` : ''
+        }`,
         { headers: { 'X-Admin-Password': adminPassword } },
       );
       responseStatus = response.status;
@@ -69,14 +87,33 @@ export default function QuestionStats() {
   }
 
   useEffect(() => {
-    if (password) void loadStatistics(password, testType);
-  }, [password, testType]);
+    if (password) void loadStatistics(password, testType, customQuizId);
+  }, [password, testType, customQuizId]);
+
+  useEffect(() => {
+    if (!password) return;
+    fetch(`${API_BASE_URL}/admin/quizzes`, {
+      headers: { 'X-Admin-Password': password },
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Could not load quizzes (${response.status}).`);
+        const quizzes = (data.quizzes ?? []).filter((quiz: QuizOption) => quiz.kind === 'custom');
+        setCustomQuizzes(quizzes);
+        setCustomQuizId((current) =>
+          quizzes.some((quiz: QuizOption) => quiz.id === current) ? current : quizzes[0]?.id ?? '',
+        );
+      })
+      .catch((requestError: unknown) => {
+        setError(requestError instanceof Error ? requestError.message : 'Could not load custom quizzes.');
+      });
+  }, [password]);
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextPassword = passwordInput;
     if (!nextPassword) return;
-    if (await loadStatistics(nextPassword, testType)) {
+    if (await loadStatistics(nextPassword, testType, customQuizId)) {
       sessionStorage.setItem(PASSWORD_KEY, nextPassword);
       setPassword(nextPassword);
       setPasswordInput('');
@@ -87,6 +124,8 @@ export default function QuestionStats() {
     sessionStorage.removeItem(PASSWORD_KEY);
     setPassword('');
     setStatistics(null);
+    setCustomQuizzes([]);
+    setCustomQuizId('');
     setError('');
     setAuthenticated(false);
   }
@@ -149,7 +188,13 @@ export default function QuestionStats() {
                 <span>Assessment</span>
                 <select
                   value={testType}
-                  onChange={(event) => setTestType(event.target.value as TestType)}
+                  onChange={(event) => {
+                    const selectedTest = event.target.value as TestType;
+                    setTestType(selectedTest);
+                    if (selectedTest === 'custom' && !customQuizzes.some((quiz) => quiz.id === customQuizId)) {
+                      setCustomQuizId(customQuizzes[0]?.id ?? '');
+                    }
+                  }}
                   disabled={loading}
                   className="rounded-xl border border-white/15 bg-gray-900 px-3 py-2 text-white outline-none focus:border-emerald-400"
                 >
@@ -158,9 +203,29 @@ export default function QuestionStats() {
                   ))}
                 </select>
               </label>
+              {testType === 'custom' && (
+                <label className="flex items-center gap-3 text-sm">
+                  <span>Custom quiz</span>
+                  <select
+                    value={customQuizId}
+                    onChange={(event) => setCustomQuizId(event.target.value)}
+                    disabled={loading || customQuizzes.length === 0}
+                    className="max-w-72 rounded-xl border border-white/15 bg-gray-900 px-3 py-2 text-white outline-none focus:border-emerald-400"
+                  >
+                    {customQuizzes.length === 0
+                      ? <option value="">No custom quizzes available</option>
+                      : customQuizzes.map((quiz) => (
+                        <option key={quiz.id} value={quiz.id}>{quiz.title}</option>
+                      ))}
+                  </select>
+                </label>
+              )}
               <button onClick={handleLogout} className="text-sm text-muted underline hover:text-white">Sign out</button>
             </section>
 
+            {authenticated && testType === 'custom' && customQuizzes.length === 0 && !loading && (
+              <p className="mt-4 text-sm text-muted">There are no custom quizzes available for question statistics.</p>
+            )}
             {loading && <p className="py-6 text-center text-sm text-muted">Loading statistics…</p>}
             {!loading && statistics && (
               <>
@@ -183,7 +248,7 @@ export default function QuestionStats() {
                   Accuracy is based on recorded answers for each question. Questions with fewer than {MINIMUM_SAMPLE_SIZE} answers
                   are marked as a small sample; unattempted questions are shown without an accuracy score.
                   Aptitude personality questions are intentionally excluded because they have no right or wrong answer.
-                  Historical answers are compared with the current question bank.
+                  For custom quizzes, changing a question resets its statistics; results remain in the admin dashboard.
                 </p>
 
                 <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-panel/60">

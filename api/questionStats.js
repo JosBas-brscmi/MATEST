@@ -65,8 +65,16 @@ function getScoredQuestions(testType) {
   throw new Error(`Unsupported question-statistics test type: ${testType}`);
 }
 
-export function getQuestionStatistics(db, testType) {
-  const questions = getScoredQuestions(testType).map((question) => ({
+export function getQuestionStatistics(db, testType, customQuiz) {
+  const customQuestions = customQuiz
+    ? JSON.parse(customQuiz.questions_json)
+      .filter((question) => question.type !== 'likert')
+      .map((question) => ({
+        ...question,
+        category: question.categoryLabel,
+      }))
+    : null;
+  const questions = (customQuestions ?? getScoredQuestions(testType)).map((question) => ({
     id: question.id,
     category: question.category,
     prompt: question.prompt,
@@ -78,16 +86,31 @@ export function getQuestionStatistics(db, testType) {
     incorrect: 0,
   }));
   const questionById = new Map(questions.map((question) => [question.id, question]));
-  const submissions = db.prepare(`
-    SELECT answers_json
-    FROM assessment_results
-    WHERE test_type = ?
-  `).all(testType);
+  const submissions = customQuiz
+    ? db.prepare(`
+      SELECT answers_json, created_at
+      FROM assessment_results
+      WHERE test_type = 'custom' AND custom_quiz_id = ?
+    `).all(customQuiz.id)
+    : db.prepare(`
+      SELECT answers_json, created_at
+      FROM assessment_results
+      WHERE test_type = ?
+    `).all(testType);
+  const questionStatsSince = customQuiz
+    ? new Map(db.prepare(`
+      SELECT question_id, stats_since
+      FROM custom_quiz_question_stats
+      WHERE quiz_id = ?
+    `).all(customQuiz.id).map((row) => [row.question_id, row.stats_since]))
+    : null;
 
   for (const submission of submissions) {
     const answers = JSON.parse(submission.answers_json);
     for (const [questionId, answerIndex] of Object.entries(answers)) {
       const question = questionById.get(questionId);
+      const statsSince = questionStatsSince?.get(questionId);
+      if (customQuiz && (!statsSince || submission.created_at < statsSince)) continue;
       if (!question || !Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= question.choices.length) {
         continue;
       }
@@ -99,6 +122,7 @@ export function getQuestionStatistics(db, testType) {
 
   return {
     testType,
+    ...(customQuiz ? { quizId: customQuiz.id, quizTitle: customQuiz.title } : {}),
     submissionCount: submissions.length,
     questions: questions.map(({ answerIndex: _answerIndex, ...question }) => ({
       ...question,

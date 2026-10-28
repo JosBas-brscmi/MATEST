@@ -121,7 +121,7 @@ export default function ManageQuizzes({ mode }: ManageQuizzesProps) {
             <h1 className="mt-1 text-2xl font-bold">{isRemoving ? 'Remove Quiz' : 'Modify Quiz'}</h1>
             <p className="mt-2 text-sm text-gray-400">
               {isRemoving
-                ? 'Remove custom quizzes or hide built-in assessments from the candidate portal. Historical results are kept.'
+                ? 'Remove custom quizzes or hide built-in assessments from the candidate portal. Quiz results remain in the admin dashboard; removing a quiz also removes its question-statistics history.'
                 : 'Edit custom quizzes. Built-in assessments are listed here so you can hide or restore them; their questions and scoring stay fixed.'}
             </p>
           </div>
