@@ -212,6 +212,12 @@ export default function Portal() {
             Each test unlocks after the previous one is submitted.
             Results are sent automatically to <strong className="text-emerald-400">MA CENTER</strong>.
           </p>
+          <svg className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <p className="text-slate-300 text-sm leading-relaxed">
+            When available, additional quizzes can be taken in any order. These are optional and do not affect the core assessments yet.
+          </p>
         </div>
         {coreTestsError && (
           <div role="alert" className="mb-6 rounded-xl border border-red-700/40 bg-red-950/30 p-3 text-sm text-red-300">
