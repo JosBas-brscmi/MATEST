@@ -220,8 +220,9 @@ export default function Portal() {
         )}
 
         {/* Assessment cards */}
+        <h2 className="mb-3 text-base font-bold text-white">Main Quizzes</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <h2 className="mb-3 text-base font-bold text-white">Main Quizzes</h2>
+          
           {cards.filter(({ key }) => activeCoreTests.includes(key)).map(({ key, phase, title, colorClass, titleColor, sub, dur, items, btnColor }) => (
             <div key={key} className={`rounded-2xl border ${colorClass} bg-slate-800/40 backdrop-blur p-6 flex flex-col`}>
               <div className="flex items-start justify-between mb-3">
