@@ -79,6 +79,31 @@ export function resetAllLocalState() {
 
 export type AnyPayload = any;
 
+export function getCompletedCustomQuizResults(
+  readResult: (quizId: string) => AnyPayload | null,
+): AnyPayload[] {
+  return loadCompletedCustomQuizIds().flatMap((quizId) => {
+    const result = readResult(quizId);
+    const score = result?.score;
+    if (
+      !result
+      || result.customQuizId !== quizId
+      || typeof result.testTitle !== 'string'
+      || !Number.isInteger(score?.correct)
+      || !Number.isInteger(score?.total)
+      || !Number.isInteger(score?.percent)
+      || score.total < 1
+      || score.correct < 0
+      || score.correct > score.total
+      || score.percent < 0
+      || score.percent > 100
+    ) {
+      return [];
+    }
+    return [result];
+  });
+}
+
 export type ResultsAll = Partial<Record<TestKey, AnyPayload>>;
 
 export function loadResultsAll(): ResultsAll {

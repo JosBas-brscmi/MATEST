@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadFinalPdf } from '../lib/pdfFinalReport';
 import { API_BASE_URL, TestKey } from '../lib';
+import { getCompletedCustomQuizResults } from '../lib/resultsStore';
 
 const TEST_LABELS: Record<TestKey, string> = {
   iq: 'Intelligence Test',
@@ -39,9 +40,10 @@ export default function ResultsFinal() {
     const iq      = readResult('iq');
     const english = readResult('english');
     const aptitude = readResult('aptitude');
+    const customQuizzes = getCompletedCustomQuizResults(readResult);
 
-    if (iq || english || aptitude) {
-      setData({ iq, english, aptitude });
+    if (iq || english || aptitude || customQuizzes.length > 0) {
+      setData({ iq, english, aptitude, customQuizzes });
     }
 
     fetch(`${API_BASE_URL}/assessments`)

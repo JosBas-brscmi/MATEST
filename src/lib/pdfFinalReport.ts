@@ -82,9 +82,26 @@ function drawRadar(
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export async function downloadFinalPdf(bundle: any) {
+export function buildFinalPdf(bundle: any): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const PW = 210, PH = 297, ML = 18, MR = 18, CW = PW - ML - MR;
+  const customQuizzes = Array.isArray(bundle.customQuizzes)
+    ? bundle.customQuizzes.filter((quiz: any) =>
+      typeof quiz?.testTitle === 'string'
+      && Number.isInteger(quiz.score?.correct)
+      && Number.isInteger(quiz.score?.total)
+      && Number.isInteger(quiz.score?.percent)
+      && quiz.score.total > 0
+      && quiz.score.correct >= 0
+      && quiz.score.correct <= quiz.score.total
+      && quiz.score.percent >= 0
+      && quiz.score.percent <= 100)
+    : [];
+  const QUIZZES_PER_PAGE = 4;
+  const customPageCount = Math.ceil(customQuizzes.length / QUIZZES_PER_PAGE);
+  const hasSecondPage = Boolean(bundle.aptitude || customPageCount);
+  const totalPageCount = (hasSecondPage ? 2 : 1) + customPageCount;
+  let customQuizSectionY = 0;
 
   // ── helpers ──
   const get = (key: string) =>
@@ -305,7 +322,7 @@ export async function downloadFinalPdf(bundle: any) {
     st(doc, [52, 211, 153]);
     doc.text('MATTA', ML + doc.getTextWidth('BROWAVE ') + 1, 12);
     st(doc, [148, 183, 220]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-    doc.text('PERSONALITY PROFILE  —  Page 2 of 2', PW - MR, 12, { align: 'right' });
+    doc.text(`PERSONALITY PROFILE  —  Page 2 of ${totalPageCount}`, PW - MR, 12, { align: 'right' });
 
     Y2 = 30;
 
@@ -365,9 +382,109 @@ export async function downloadFinalPdf(bundle: any) {
     drawFooter(doc);
   }
 
+  if (!bundle.aptitude && customPageCount > 0) {
+    doc.addPage();
+    sf(doc, C.navy); doc.rect(0, 0, PW, 20, 'F');
+    sf(doc, C.accent); doc.rect(0, 18, PW, 2, 'F');
+    st(doc, C.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('BROWAVE', ML, 12);
+    st(doc, [52, 211, 153]);
+    doc.text('MATTA', ML + doc.getTextWidth('BROWAVE ') + 1, 12);
+    st(doc, [148, 183, 220]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+    doc.text(`ASSESSMENT PROFILE  —  Page 2 of ${totalPageCount}`, PW - MR, 12, { align: 'right' });
+
+    section('III. APTITUDE & PERSONALITY', '— Not completed', C.accent, 30);
+    st(doc, C.textMid); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text('No Aptitude & Personality assessment result was available for this report.', ML + 7, 52);
+    drawFooter(doc);
+  }
+
   // ════════════════════════════════════════
-  //  SAVE
+  //  CUSTOM QUIZ RESULTS — PAGES 3+
   // ════════════════════════════════════════
+  customQuizzes.forEach((quiz: any, index: number) => {
+    const quizPageIndex = Math.floor(index / QUIZZES_PER_PAGE);
+    const pageNumber = 3 + quizPageIndex;
+    const indexOnPage = index % QUIZZES_PER_PAGE;
+    if (indexOnPage === 0) {
+      doc.addPage();
+
+      sf(doc, C.navy); doc.rect(0, 0, PW, 20, 'F');
+      sf(doc, C.accent); doc.rect(0, 18, PW, 2, 'F');
+      st(doc, C.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text('BROWAVE', ML, 12);
+      st(doc, [52, 211, 153]);
+      doc.text('MATTA', ML + doc.getTextWidth('BROWAVE ') + 1, 12);
+      st(doc, [148, 183, 220]); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+      doc.text(`CUSTOM QUIZ RESULTS  —  Page ${pageNumber} of ${totalPageCount}`, PW - MR, 12, { align: 'right' });
+      drawFooter(doc);
+
+      let sectionY = 30;
+      if (quizPageIndex === 0) {
+        sectionY = section('IV. CUSTOM QUIZ RESULTS', '— Additional Assessments', C.accent, sectionY);
+      } else {
+        st(doc, C.textDark); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.text('CUSTOM QUIZ RESULTS', ML, sectionY + 1);
+        st(doc, C.textLight); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.text('Continued', ML, sectionY + 7);
+        sectionY += 15;
+      }
+      customQuizSectionY = sectionY + 2;
+    }
+
+    const sectionY = customQuizSectionY;
+    const title = `${index + 1}. ${quiz.testTitle}`;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    const titleLines = doc.splitTextToSize(title, CW - 12) as string[];
+    const stripeHeight = Math.max(9, titleLines.length * 5 + 2);
+    sf(doc, C.accent); doc.roundedRect(ML, sectionY, 4, stripeHeight, 1.5, 1.5, 'F');
+    st(doc, C.accent); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+    doc.text(titleLines, ML + 7, sectionY + 5.5, { lineHeightFactor: 1.15 });
+
+    const date = quiz.submittedAtISO
+      ? new Date(quiz.submittedAtISO)
+      : null;
+    const completedAt = date && Number.isFinite(date.getTime())
+      ? date.toLocaleString('en-PH', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Manila',
+      })
+      : 'Date unavailable';
+    const dateY = sectionY + Math.max(12, titleLines.length * 5.5 + 2);
+    st(doc, C.textLight); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.text(`Completed ${completedAt}`, ML + 7, dateY);
+
+    const scoreY = dateY + 5;
+    const score = quiz.score;
+    const nextY = scoreBlock(
+      doc,
+      scoreY,
+      score.percent,
+      score.correct,
+      score.total,
+      quiz.testTitle,
+      [235, 252, 245],
+      C.accent,
+    );
+    customQuizSectionY = nextY + 1;
+  });
+
+  // ════════════════════════════════════════
+  //  RETURN GENERATED DOCUMENT
+  // ════════════════════════════════════════
+  return doc;
+}
+
+export async function downloadFinalPdf(bundle: any) {
+  const doc = buildFinalPdf(bundle);
+  const name = bundle.iq?.candidateName
+    || bundle.english?.candidateName
+    || bundle.aptitude?.candidateName
+    || 'Candidate';
   const safeName = (name || 'Candidate').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
   doc.save(`MATTA_Report_${safeName}.pdf`);
 }

@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1460" height="1030" viewBox="0 0 1460 1030" role="img" aria-labelledby="title description">
+  <title id="title">Custom quiz final PDF continuation, pages 3 and 4</title>
+  <desc id="description">A two-page PDF preview styled after the current MATTA report, with its navy continuation headers, emerald accents, score section headings, compact score blocks, progress bars, and matching footers.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-8%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#08193a" flood-opacity=".16"/>
+    </filter>
+    <style>
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+      .dark { fill: #141e3c; }
+      .light { fill: #64789b; }
+      .mid { fill: #3c5078; }
+      .accent { fill: #10b981; }
+      .navy { fill: #08193a; }
+      .line { stroke: #c8d7f0; stroke-width: 1; }
+    </style>
+  </defs>
+  <rect width="1460" height="1030" fill="#e9eef5"/>
+  <text x="44" y="40" class="sans" font-size="17" font-weight="700" fill="#20324d">CUSTOM QUIZ SECTION - PDF PREVIEW</text>
+  <text x="44" y="62" class="sans" font-size="12" fill="#60708a">Pages 3 onward · sample quiz data · formatted to match the existing MATTA report generator</text>
+
+  <!-- Page 3 -->
+  <g transform="translate(48 88)" filter="url(#shadow)">
+    <rect width="660" height="933" rx="2" fill="#fff"/>
+  </g>
+  <g transform="translate(48 88)">
+    <rect width="660" height="63" class="navy"/>
+    <rect y="57" width="660" height="6" class="accent"/>
+    <text x="57" y="38" class="sans" font-size="18" font-weight="700" fill="#fff">BROWAVE</text>
+    <text x="154" y="38" class="sans" font-size="18" font-weight="700" fill="#34d399">MATTA</text>
+    <text x="603" y="35" class="sans" font-size="9" text-anchor="end" fill="#94b7dc">CUSTOM QUIZ RESULTS - Page 3 of 4</text>
+    <text x="57" y="142" class="sans" font-size="13" font-weight="700" fill="#10b981">IV. CUSTOM QUIZ RESULTS</text>
+    <text x="260" y="142" class="sans" font-size="10" fill="#64789b">- Additional assessments</text>
+
+    <!-- Quiz 1 heading and score block -->
+    <rect x="57" y="170" width="12" height="28" rx="5" class="accent"/>
+    <text x="78" y="190" class="sans" font-size="13" font-weight="700" fill="#10b981">1. Customer Service Essentials</text>
+    <text x="380" y="190" class="sans" font-size="9" fill="#64789b">- Completed 28 Oct 2026</text>
+    <rect x="57" y="208" width="546" height="64" rx="8" fill="#ebfcf5"/>
+    <rect x="57" y="208" width="11" height="64" rx="5" class="accent"/>
+    <text x="83" y="253" class="sans" font-size="30" font-weight="700" fill="#141e3c">86%</text>
+    <text x="146" y="234" class="sans" font-size="13" font-weight="700" fill="#2563eb">Above Average</text>
+    <text x="146" y="254" class="sans" font-size="11" fill="#3c5078">6 / 7 correct answers</text>
+    <rect x="302" y="228" width="235" height="12" rx="6" fill="#e1e8f2"/>
+    <rect x="302" y="228" width="202" height="12" rx="6" fill="#2563eb"/>
+    <text x="302" y="259" class="sans" font-size="9" fill="#64789b">0</text>
+    <text x="537" y="259" class="sans" font-size="9" text-anchor="end" fill="#64789b">100</text>
+
+    <!-- Quiz 2 -->
+    <rect x="57" y="300" width="12" height="28" rx="5" class="accent"/>
+    <text x="78" y="320" class="sans" font-size="13" font-weight="700" fill="#10b981">2. Workplace Communication</text>
+    <text x="357" y="320" class="sans" font-size="9" fill="#64789b">- Completed 27 Oct 2026</text>
+    <rect x="57" y="338" width="546" height="64" rx="8" fill="#ebfcf5"/>
+    <rect x="57" y="338" width="11" height="64" rx="5" class="accent"/>
+    <text x="83" y="383" class="sans" font-size="30" font-weight="700" fill="#141e3c">80%</text>
+    <text x="146" y="364" class="sans" font-size="13" font-weight="700" fill="#2563eb">Above Average</text>
+    <text x="146" y="384" class="sans" font-size="11" fill="#3c5078">8 / 10 correct answers</text>
+    <rect x="302" y="358" width="235" height="12" rx="6" fill="#e1e8f2"/>
+    <rect x="302" y="358" width="188" height="12" rx="6" fill="#2563eb"/>
+    <text x="302" y="389" class="sans" font-size="9" fill="#64789b">0</text>
+    <text x="537" y="389" class="sans" font-size="9" text-anchor="end" fill="#64789b">100</text>
+
+    <!-- Quiz 3 -->
+    <rect x="57" y="430" width="12" height="28" rx="5" class="accent"/>
+    <text x="78" y="450" class="sans" font-size="13" font-weight="700" fill="#10b981">3. Logical Reasoning Practice</text>
+    <text x="370" y="450" class="sans" font-size="9" fill="#64789b">- Completed 26 Oct 2026</text>
+    <rect x="57" y="468" width="546" height="64" rx="8" fill="#ebfcf5"/>
+    <rect x="57" y="468" width="11" height="64" rx="5" class="accent"/>
+    <text x="83" y="513" class="sans" font-size="30" font-weight="700" fill="#141e3c">75%</text>
+    <text x="146" y="494" class="sans" font-size="13" font-weight="700" fill="#2563eb">Above Average</text>
+    <text x="146" y="514" class="sans" font-size="11" fill="#3c5078">3 / 4 correct answers</text>
+    <rect x="302" y="488" width="235" height="12" rx="6" fill="#e1e8f2"/>
+    <rect x="302" y="488" width="176" height="12" rx="6" fill="#2563eb"/>
+    <text x="302" y="519" class="sans" font-size="9" fill="#64789b">0</text>
+    <text x="537" y="519" class="sans" font-size="9" text-anchor="end" fill="#64789b">100</text>
+
+    <!-- Quiz 4 -->
+    <rect x="57" y="560" width="12" height="28" rx="5" class="accent"/>
+    <text x="78" y="580" class="sans" font-size="13" font-weight="700" fill="#10b981">4. Digital Skills Check</text>
+    <text x="300" y="580" class="sans" font-size="9" fill="#64789b">- Completed 25 Oct 2026</text>
+    <rect x="57" y="598" width="546" height="64" rx="8" fill="#ebfcf5"/>
+    <rect x="57" y="598" width="11" height="64" rx="5" class="accent"/>
+    <text x="83" y="643" class="sans" font-size="30" font-weight="700" fill="#141e3c">92%</text>
+    <text x="146" y="624" class="sans" font-size="13" font-weight="700" fill="#059669">Exceptional</text>
+    <text x="146" y="644" class="sans" font-size="11" fill="#3c5078">11 / 12 correct answers</text>
+    <rect x="302" y="618" width="235" height="12" rx="6" fill="#e1e8f2"/>
+    <rect x="302" y="618" width="216" height="12" rx="6" fill="#059669"/>
+    <text x="302" y="649" class="sans" font-size="9" fill="#64789b">0</text>
+    <text x="537" y="649" class="sans" font-size="9" text-anchor="end" fill="#64789b">100</text>
+
+    <line x1="57" y1="888" x2="603" y2="888" class="line"/>
+    <text x="57" y="918" class="sans" font-size="8" fill="#648cbc">BROWAVE Corporation   /   MA4.0 Program   /   Philippines Recruitment</text>
+    <text x="603" y="918" class="sans" font-size="8" text-anchor="end" fill="#648cbc">CONFIDENTIAL - For MA CENTER use only</text>
+    <rect y="921" width="660" height="12" class="navy"/>
+    <rect y="921" width="660" height="2" class="accent"/>
+  </g>
+
+  <!-- Page 4 -->
+  <g transform="translate(752 88)" filter="url(#shadow)">
+    <rect width="660" height="933" rx="2" fill="#fff"/>
+  </g>
+  <g transform="translate(752 88)">
+    <rect width="660" height="63" class="navy"/>
+    <rect y="57" width="660" height="6" class="accent"/>
+    <text x="57" y="38" class="sans" font-size="18" font-weight="700" fill="#fff">BROWAVE</text>
+    <text x="154" y="38" class="sans" font-size="18" font-weight="700" fill="#34d399">MATTA</text>
+    <text x="603" y="35" class="sans" font-size="9" text-anchor="end" fill="#94b7dc">CUSTOM QUIZ RESULTS - Page 4 of 4</text>
+    <text x="57" y="116" class="sans" font-size="13" font-weight="700" fill="#141e3c">CUSTOM QUIZ RESULTS</text>
+    <text x="57" y="140" class="sans" font-size="10" fill="#64789b">Continued</text>
+
+    <!-- Quiz 5 -->
+    <rect x="57" y="170" width="12" height="28" rx="5" class="accent"/>
+    <text x="78" y="190" class="sans" font-size="13" font-weight="700" fill="#10b981">5. Teamwork Scenarios</text>
+    <text x="291" y="190" class="sans" font-size="9" fill="#64789b">- Completed 24 Oct 2026</text>
+    <rect x="57" y="208" width="546" height="64" rx="8" fill="#ebfcf5"/>
+    <rect x="57" y="208" width="11" height="64" rx="5" class="accent"/>
+    <text x="83" y="253" class="sans" font-size="30" font-weight="700" fill="#141e3c">70%</text>
+    <text x="146" y="234" class="sans" font-size="13" font-weight="700" fill="#b47800">Average</text>
+    <text x="146" y="254" class="sans" font-size="11" fill="#3c5078">7 / 10 correct answers</text>
+    <rect x="302" y="228" width="235" height="12" rx="6" fill="#e1e8f2"/>
+    <rect x="302" y="228" width="165" height="12" rx="6" fill="#b47800"/>
+    <text x="302" y="259" class="sans" font-size="9" fill="#64789b">0</text>
+    <text x="537" y="259" class="sans" font-size="9" text-anchor="end" fill="#64789b">100</text>
+
+    <!-- Quiz 6 -->
+    <rect x="57" y="300" width="12" height="28" rx="5" class="accent"/>
+    <text x="78" y="320" class="sans" font-size="13" font-weight="700" fill="#10b981">6. Workplace Safety Basics</text>
+    <text x="358" y="320" class="sans" font-size="9" fill="#64789b">- Completed 23 Oct 2026</text>
+    <rect x="57" y="338" width="546" height="64" rx="8" fill="#ebfcf5"/>
+    <rect x="57" y="338" width="11" height="64" rx="5" class="accent"/>
+    <text x="83" y="383" class="sans" font-size="30" font-weight="700" fill="#141e3c">88%</text>
+    <text x="146" y="364" class="sans" font-size="13" font-weight="700" fill="#2563eb">Above Average</text>
+    <text x="146" y="384" class="sans" font-size="11" fill="#3c5078">7 / 8 correct answers</text>
+    <rect x="302" y="358" width="235" height="12" rx="6" fill="#e1e8f2"/>
+    <rect x="302" y="358" width="207" height="12" rx="6" fill="#2563eb"/>
+    <text x="302" y="389" class="sans" font-size="9" fill="#64789b">0</text>
+    <text x="537" y="389" class="sans" font-size="9" text-anchor="end" fill="#64789b">100</text>
+
+    <line x1="57" y1="888" x2="603" y2="888" class="line"/>
+    <text x="57" y="918" class="sans" font-size="8" fill="#648cbc">BROWAVE Corporation   /   MA4.0 Program   /   Philippines Recruitment</text>
+    <text x="603" y="918" class="sans" font-size="8" text-anchor="end" fill="#648cbc">CONFIDENTIAL - For MA CENTER use only</text>
+    <rect y="921" width="660" height="12" class="navy"/>
+    <rect y="921" width="660" height="2" class="accent"/>
+  </g>
+</svg>
