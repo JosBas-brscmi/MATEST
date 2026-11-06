@@ -2,11 +2,17 @@ import 'dotenv/config';
 import { createServer } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { openDatabase } from './database.js';
 import { getQuestionStatistics } from './questionStats.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const port = Number(process.env.PORT || 3001);
+const host = process.env.HOST || '0.0.0.0';
 const { db, databasePath } = openDatabase();
 const ADMIN_MAX_FAILED_ATTEMPTS = 4;
 const ADMIN_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
@@ -154,6 +160,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use(express.json({ limit: '1mb', strict: true }));
+app.use(express.static(path.join(__dirname, '../dist')));
 
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true });
@@ -393,6 +400,12 @@ app.delete('/api/admin/results', requireAdmin, (request, response) => {
   return response.json({ ok: true, deletedCount: deletedIds.length });
 });
 
+// SPA Catch-all: Send index.html for non-API web requests
+app.get('*', (request, response, next) => {
+  if (request.path.startsWith('/api')) return next();
+  return response.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
 app.use((error, _request, response, _next) => {
   if (error?.type === 'entity.parse.failed') {
     return response.status(400).json({ error: 'Request body must contain valid JSON.' });
@@ -405,8 +418,8 @@ app.use((error, _request, response, _next) => {
 });
 
 const server = createServer(app);
-server.listen(port, '127.0.0.1', () => {
-  console.log(`MATTA API listening on http://127.0.0.1:${port}`);
+server.listen(port, host, () => {
+  console.log(`MATTA API listening on http://${host}:${port}`);
   console.log(`SQLite database: ${databasePath}`);
 });
 
