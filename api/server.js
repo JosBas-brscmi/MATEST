@@ -401,7 +401,7 @@ app.delete('/api/admin/results', requireAdmin, (request, response) => {
 });
 
 // SPA Catch-all: Send index.html for non-API web requests
-app.get('*', (request, response, next) => {
+app.get('/{*splat}', (request, response, next) => {
   if (request.path.startsWith('/api')) return next();
   return response.sendFile(path.join(__dirname, '../dist/index.html'));
 });
