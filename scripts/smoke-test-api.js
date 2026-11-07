@@ -151,42 +151,75 @@ try {
     'iq', 'english', 'aptitude',
   ]);
 
+  async function startAssessment(testType) {
+    const response = await fetch(`${baseUrl}/api/assessment-attempts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testType }),
+    });
+    const attempt = await response.json();
+    assert.equal(response.status, 201, JSON.stringify(attempt));
+    assert.ok(attempt.questions.length > 0);
+    assert.ok(attempt.questions.every((question) => !Object.hasOwn(question, 'answerIndex')));
+    return attempt;
+  }
+
   const invalid = await fetch(`${baseUrl}/api/results`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
   });
   assert.equal(invalid.status, 400);
 
+  const iqAttempt = await startAssessment('iq');
   const payload = {
     testKey: 'IQ-SMOKE-TEST-001',
     testType: 'iq',
+    assessmentAttemptId: iqAttempt.attemptId,
     candidateEmail: 'SMOKE@example.test',
     candidateName: 'Smoke Test',
     candidateSchool: 'Local School',
     candidateCourse: 'Assessment',
     candidatePhone: '123456789',
     submittedAtISO: new Date().toISOString(),
-    score: { correct: 4, total: 5, percent: 80 },
-    answers: { p01: 2, p02: 1 },
+    score: { correct: 999, total: 1, percent: 100 },
+    answers: Object.fromEntries(iqAttempt.questions.slice(0, 2).map((question) => [question.id, 0])),
     autoSubmitted: false,
   };
   const submission = await fetch(`${baseUrl}/api/results`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
-  assert.equal(submission.status, 201, await submission.text());
+  const submissionBody = await submission.json();
+  assert.equal(submission.status, 201, JSON.stringify(submissionBody));
+  assert.ok(submissionBody.score.correct >= 0 && submissionBody.score.correct <= 25);
+  assert.equal(submissionBody.score.total, 25);
+
+  const aptitudeAttempt = await startAssessment('aptitude');
+  const aptitudeAnswers = Object.fromEntries(aptitudeAttempt.questions.map((question) => [
+    question.id,
+    question.type === 'likert' ? 2 : 0,
+  ]));
 
   const aptitudePayload = {
     ...payload,
     testKey: 'APT-SMOKE-TEST-001',
     testType: 'aptitude',
+    assessmentAttemptId: aptitudeAttempt.attemptId,
     submittedAtISO: new Date(Date.now() + 1000).toISOString(),
-    score: { correct: 12, total: 15, percent: 80 },
-    answers: { wa01: 1, wa02: 0 },
+    answers: aptitudeAnswers,
     autoSubmitted: true,
   };
   const aptitudeSubmission = await fetch(`${baseUrl}/api/results`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(aptitudePayload),
   });
-  assert.equal(aptitudeSubmission.status, 201, await aptitudeSubmission.text());
+  const aptitudeSubmissionBody = await aptitudeSubmission.json();
+  assert.equal(aptitudeSubmission.status, 201, JSON.stringify(aptitudeSubmissionBody));
+  assert.equal(aptitudeSubmissionBody.score.total, 15);
+  assert.deepEqual(aptitudeSubmissionBody.aptitudeReport.personality, {
+    conscientiousness: 50,
+    extraversion: 50,
+    agreeableness: 50,
+    emotional_stability: 50,
+    openness: 50,
+  });
 
   const customQuiz = {
     title: 'Custom Smoke Quiz',
@@ -263,7 +296,7 @@ try {
   const unavailableSubmission = await fetch(`${baseUrl}/api/results`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, testType: 'iq' }),
+    body: JSON.stringify({ ...payload, testKey: 'IQ-UNAVAILABLE-SMOKE', testType: 'iq' }),
   });
   assert.equal(unavailableSubmission.status, 400);
   const restoreBuiltinResponse = await fetch(`${baseUrl}/api/admin/assessments/iq`, {
@@ -400,13 +433,13 @@ try {
     assert.equal(readResult.candidate_id, candidate.id);
     assert.equal(readResult.test_type, payload.testType);
     assert.equal(readResult.submitted_at, payload.submittedAtISO);
-    assert.equal(readResult.score_percent, payload.score.percent);
-    assert.equal(readResult.score_correct, payload.score.correct);
-    assert.equal(readResult.score_total, payload.score.total);
+    assert.equal(readResult.score_percent, submissionBody.score.percent);
+    assert.equal(readResult.score_total, 25);
     assert.equal(readResult.auto_submitted, 0);
     assert.equal(readResult.answers_json, JSON.stringify(payload.answers));
     assert.equal(readResult.aptitude_report_json, null);
-    assert.deepEqual(JSON.parse(readResult.payload_json), payload);
+    assert.equal(JSON.parse(readResult.payload_json).score.correct, readResult.score_correct);
+    assert.notEqual(readResult.score_correct, payload.score.correct);
     assert.ok(readResult.created_at);
 
     const aptitudeResult = db.prepare('SELECT * FROM assessment_results WHERE test_key = ?').get(aptitudePayload.testKey);
@@ -427,6 +460,12 @@ try {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
   assert.equal(duplicate.status, 409);
+  const reusedAttempt = await fetch(`${baseUrl}/api/results`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, testKey: 'IQ-REUSED-ATTEMPT-SMOKE' }),
+  });
+  assert.equal(reusedAttempt.status, 400);
 
   const unauthorized = await fetch(`${baseUrl}/api/admin/results`);
   assert.equal(unauthorized.status, 401);
@@ -442,11 +481,11 @@ try {
   assert.equal(iqQuestionStatsResponse.status, 200);
   const iqQuestionStats = await iqQuestionStatsResponse.json();
   assert.equal(iqQuestionStats.testType, 'iq');
-  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p01').responses, 1);
-  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p01').correct, 1);
-  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p01').accuracyPercent, 100);
-  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p02').incorrect, 1);
-  assert.equal(iqQuestionStats.questions.find((question) => question.id === 'p02').accuracyPercent, 0);
+  for (const questionId of Object.keys(payload.answers)) {
+    const question = iqQuestionStats.questions.find((item) => item.id === questionId);
+    assert.equal(question.responses, 1);
+    assert.equal(question.correct + question.incorrect, 1);
+  }
   const englishQuestionStatsResponse = await fetch(`${baseUrl}/api/admin/question-stats?testType=english`, {
     headers: { 'X-Admin-Password': adminPassword },
   });

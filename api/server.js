@@ -7,17 +7,25 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { openDatabase } from './database.js';
 import { getQuestionStatistics } from './questionStats.js';
+import {
+  createAssessmentQuestions,
+  getAptitudePersonality,
+  scoreAssessmentQuestions,
+} from './assessmentQuestions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const port = Number(process.env.PORT || 3001);
-const host = process.env.HOST || '0.0.0.0';
+const host = process.env.HOST || '127.0.0.1';
 const { db, databasePath } = openDatabase();
 const ADMIN_MAX_FAILED_ATTEMPTS = 4;
 const ADMIN_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
 const ADMIN_LOCKOUT_MS = 60 * 60 * 1000;
 const failedAdminAttempts = new Map();
+const assessmentAttempts = new Map();
+const ASSESSMENT_ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000;
+const MAX_ACTIVE_ASSESSMENT_ATTEMPTS = 5000;
 const BUILTIN_ASSESSMENTS = [
   { key: 'iq', title: 'IQ Assessment', durationMinutes: 30, questionCount: 25 },
   { key: 'english', title: 'English Assessment', durationMinutes: 25, questionCount: 25 },
@@ -176,6 +184,39 @@ app.get('/api/assessments', (_request, response) => {
   return response.json({ assessments });
 });
 
+app.post('/api/assessment-attempts', (request, response) => {
+  const { testType } = request.body ?? {};
+  if (!['iq', 'english', 'aptitude'].includes(testType)) {
+    return response.status(400).json({ error: 'testType must be iq, english, or aptitude.' });
+  }
+  const assessment = db.prepare('SELECT is_active FROM builtin_assessments WHERE test_key = ?').get(testType);
+  if (!assessment?.is_active) {
+    return response.status(400).json({ error: 'This assessment is not currently available.' });
+  }
+
+  const now = Date.now();
+  for (const [attemptId, attempt] of assessmentAttempts) {
+    if (attempt.expiresAt <= now || attempt.used) assessmentAttempts.delete(attemptId);
+  }
+  if (assessmentAttempts.size >= MAX_ACTIVE_ASSESSMENT_ATTEMPTS) {
+    return response.status(503).json({ error: 'Too many active assessment attempts. Please try again later.' });
+  }
+
+  const attemptId = randomUUID();
+  const questions = createAssessmentQuestions(testType);
+  assessmentAttempts.set(attemptId, {
+    testType,
+    questions,
+    expiresAt: now + ASSESSMENT_ATTEMPT_TTL_MS,
+    used: false,
+  });
+  return response.status(201).json({
+    attemptId,
+    durationMinutes: BUILTIN_ASSESSMENTS.find((item) => item.key === testType).durationMinutes,
+    questions: questions.map(({ answerIndex: _answerIndex, ...question }) => question),
+  });
+});
+
 app.get('/api/quizzes', (_request, response) => {
   const quizzes = db.prepare(`
     SELECT id, title, duration_minutes, questions_json
@@ -297,22 +338,51 @@ app.delete('/api/admin/quizzes/:quizId', requireAdmin, (request, response) => {
 app.post('/api/results', (request, response) => {
   const validationError = validatePayload(request.body);
   if (validationError) return response.status(400).json({ error: validationError });
+  if (db.prepare('SELECT 1 FROM assessment_results WHERE test_key = ?').get(request.body.testKey)) {
+    return response.status(409).json({ error: 'This test submission has already been recorded.' });
+  }
 
+  let assessmentAttempt = null;
+  let score;
   if (['iq', 'english', 'aptitude'].includes(request.body.testType)) {
     const assessment = db.prepare('SELECT is_active FROM builtin_assessments WHERE test_key = ?')
       .get(request.body.testType);
     if (!assessment?.is_active) {
       return response.status(400).json({ error: 'This assessment is not currently available.' });
     }
+    assessmentAttempt = assessmentAttempts.get(request.body.assessmentAttemptId);
+    if (
+      !assessmentAttempt
+      || assessmentAttempt.testType !== request.body.testType
+      || assessmentAttempt.expiresAt <= Date.now()
+      || assessmentAttempt.used
+    ) {
+      return response.status(400).json({ error: 'This assessment attempt is invalid or has expired. Start a new attempt.' });
+    }
+    const attemptQuestionById = new Map(assessmentAttempt.questions.map((question) => [question.id, question]));
+    for (const [questionId, answer] of Object.entries(request.body.answers)) {
+      const question = attemptQuestionById.get(questionId);
+      if (!question || answer >= question.choices.length) {
+        return response.status(400).json({ error: 'Answers must refer only to questions in this assessment attempt.' });
+      }
+    }
+    score = scoreAssessmentQuestions(assessmentAttempt.questions, request.body.answers);
   }
 
   if (request.body.testType === 'custom') {
     const quiz = db.prepare('SELECT questions_json FROM custom_quizzes WHERE id = ?').get(request.body.customQuizId);
     if (!quiz) return response.status(400).json({ error: 'The custom quiz could not be found.' });
     const questions = JSON.parse(quiz.questions_json);
+    const questionById = new Map(questions.map((question) => [question.id, question]));
+    for (const [questionId, answer] of Object.entries(request.body.answers)) {
+      const question = questionById.get(questionId);
+      if (!question || answer >= question.choices.length) {
+        return response.status(400).json({ error: 'Answers must refer only to questions in this quiz.' });
+      }
+    }
     const scoredQuestions = questions.filter((question) => question.type !== 'likert');
     const correct = scoredQuestions.filter((question) => request.body.answers[question.id] === question.answerIndex).length;
-    request.body.score = {
+    score = {
       correct,
       total: scoredQuestions.length,
       percent: Math.round((correct / scoredQuestions.length) * 100),
@@ -320,11 +390,16 @@ app.post('/api/results', (request, response) => {
   }
 
   try {
-    const id = saveResult(request.body);
+    const resultPayload = { ...request.body, score };
+    const id = saveResult(resultPayload);
+    if (assessmentAttempt) assessmentAttempt.used = true;
     return response.status(201).json({
       ok: true,
       id,
-      ...(request.body.testType === 'custom' ? { score: request.body.score } : {}),
+      score,
+      ...(request.body.testType === 'aptitude'
+        ? { aptitudeReport: { aptitudeCorrect: score.correct, aptitudeTotal: score.total, aptitudePercent: score.percent, personality: getAptitudePersonality(request.body.answers) } }
+        : {}),
     });
   } catch (error) {
     if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -442,20 +517,19 @@ function validatePayload(payload) {
   if (typeof payload.submittedAtISO !== 'string' || !Number.isFinite(Date.parse(payload.submittedAtISO))) {
     return 'submittedAtISO must be a valid date.';
   }
-  const score = payload.score;
-  if (!score || !Number.isInteger(score.correct) || !Number.isInteger(score.total) || !Number.isInteger(score.percent)) {
-    return 'score must contain integer correct, total, and percent values.';
-  }
-  if (score.total < 1 || score.total > 100 || score.correct < 0 || score.correct > score.total || score.percent !== Math.round((score.correct / score.total) * 100)) {
-    return 'score values are outside the accepted range or inconsistent.';
-  }
   if (!payload.answers || typeof payload.answers !== 'object' || Array.isArray(payload.answers) || Object.keys(payload.answers).length > 100) {
     return 'answers must be an object containing at most 100 answers.';
   }
   for (const [questionId, answer] of Object.entries(payload.answers)) {
-    if (questionId.length > 64 || !Number.isInteger(answer) || answer < 0 || answer > 10) {
-      return 'Each answer must have a short question ID and an integer choice from 0 to 10.';
+    if (questionId.length > 64 || !Number.isInteger(answer) || answer < 0 || answer > 4) {
+      return 'Each answer must have a short question ID and an integer choice from 0 to 4.';
     }
+  }
+  if (
+    ['iq', 'english', 'aptitude'].includes(payload.testType)
+    && (typeof payload.assessmentAttemptId !== 'string' || !payload.assessmentAttemptId)
+  ) {
+    return 'assessmentAttemptId is required for built-in assessments.';
   }
   if (typeof payload.autoSubmitted !== 'boolean') return 'autoSubmitted must be a boolean.';
   return null;
@@ -605,18 +679,5 @@ function recordAdminPasswordFailure(clientAddress, now = Date.now()) {
 }
 
 function createAptitudeReport(answers) {
-  const dimensions = {
-    conscientiousness: ['p01', 'p02', 'p03'],
-    extraversion: ['p04', 'p05', 'p06'],
-    agreeableness: ['p07', 'p08', 'p09'],
-    emotional_stability: ['p10', 'p11', 'p12'],
-    openness: ['p13', 'p14', 'p15'],
-  };
-  const reverseIds = new Set(['p03', 'p06', 'p09', 'p12', 'p15']);
-  const personality = Object.fromEntries(Object.entries(dimensions).map(([dimension, ids]) => {
-    const scores = ids.filter((id) => Number.isInteger(answers[id])).map((id) => reverseIds.has(id) ? 4 - answers[id] : answers[id]);
-    const average = scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 2;
-    return [dimension, Math.round((average / 4) * 100)];
-  }));
-  return { personality };
+  return { personality: getAptitudePersonality(answers) };
 }

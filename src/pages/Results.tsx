@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getScoreLabel } from '../data/questionBank';
-import {
-  scoreAptitude,
-  DIMENSION_LABELS,
-  type AptitudeScores,
-  type PersonalityDimension,
-} from '../data/aptitudeBank';
+import { getScoreLabel } from '../lib/scoreLabel';
+import { DIMENSION_LABELS, type PersonalityDimension } from '../lib/aptitudeLabels';
+
+interface AptitudeReport {
+  aptitudeCorrect: number;
+  aptitudeTotal: number;
+  aptitudePercent: number;
+  personality: Record<PersonalityDimension, number>;
+}
 
 interface ResultPayload {
   testKey: string;
@@ -21,6 +23,7 @@ interface ResultPayload {
   score: { correct: number; total: number; percent: number };
   answers: Record<string, number>;
   autoSubmitted: boolean;
+  aptitudeReport?: AptitudeReport;
 }
 
 // ── Simple radar chart using SVG ──────────────────────────────────────────────
@@ -103,7 +106,7 @@ export default function Results() {
   const { testKey = 'iq' } = useParams<{ testKey: string }>();
   const navigate = useNavigate();
   const [result, setResult]           = useState<ResultPayload | null>(null);
-  const [aptScores, setAptScores]     = useState<AptitudeScores | null>(null);
+  const [aptScores, setAptScores]     = useState<AptitudeReport | null>(null);
   const [animScore, setAnimScore]     = useState(0);
   const [animDims, setAnimDims]       = useState<Record<string, number>>({});
 
@@ -127,8 +130,8 @@ export default function Results() {
       }, 30);
 
       // Aptitude-specific scoring
-      if (isAptitude && r.answers) {
-        const scores = scoreAptitude(r.answers);
+      if (isAptitude && r.aptitudeReport) {
+        const scores = r.aptitudeReport;
         setAptScores(scores);
 
         // Animate radar dims
@@ -322,7 +325,6 @@ export default function Results() {
     </div>
   );
 }
-
 
 
 

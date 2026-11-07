@@ -8,7 +8,12 @@ const basePath = base === '/' ? '' : base.slice(0, -1)
 export default defineConfig({
   plugins: [react()],
   base,
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    minify: 'esbuild',
+    sourcemap: false,
+  },
   server: {
     proxy: {
       [`${basePath}/api`]: {

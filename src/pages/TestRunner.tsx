@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getRandomIQQuestions } from '../data/questionBank';
-import { getRandomEnglishQuestions } from '../data/englishBank';
-import { getAptitudeQuestions } from '../data/aptitudeBank';
-import { API_BASE_URL, TEST_SPECS, scoreSimple, formatDuration } from '../lib';
+import { API_BASE_URL, TEST_SPECS, formatDuration } from '../lib';
 import type { CustomQuiz, Question } from '../lib';
 import { loadCompletedCustomQuizIds, markCustomQuizCompleted } from '../lib/resultsStore';
 
@@ -19,15 +16,6 @@ function markCompleted(key: string) {
     if (key === 'english' && p.aptitude === 'locked') p.aptitude = 'available';
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
   } catch { /* ignore */ }
-}
-
-function loadQuestions(testKey: string): Question[] {
-  switch (testKey) {
-    case 'iq':       return getRandomIQQuestions();
-    case 'english':  return getRandomEnglishQuestions();
-    case 'aptitude': return getAptitudeQuestions();
-    default:         return [];
-  }
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -51,8 +39,9 @@ export default function TestRunner() {
   const isBuiltinAssessment = ['iq', 'english', 'aptitude'].includes(testKey);
   const isAptitude = testKey === 'aptitude';
 
-  const [questions, setQuestions] = useState<Question[]>(() => loadQuestions(testKey));
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [customQuiz, setCustomQuiz] = useState<CustomQuiz | null>(null);
+  const [assessmentAttemptId, setAssessmentAttemptId] = useState('');
   const [quizLoading, setQuizLoading] = useState(isCustomQuiz || isBuiltinAssessment);
   const [quizLoadError, setQuizLoadError] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(spec.durationMinutes);
@@ -90,15 +79,21 @@ export default function TestRunner() {
 
   useEffect(() => {
     if (!isBuiltinAssessment) return;
-    fetch(`${API_BASE_URL}/assessments`)
+    fetch(`${API_BASE_URL}/assessment-attempts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testType: testKey }),
+    })
       .then(async (response) => {
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || `Could not check assessment availability (${response.status}).`);
-        const isAvailable = (data.assessments ?? []).some((assessment: { key: string }) => assessment.key === testKey);
-        if (!isAvailable) throw new Error('This assessment is not currently available.');
+        if (!response.ok) throw new Error(data.error || `Could not load assessment (${response.status}).`);
+        setAssessmentAttemptId(data.attemptId);
+        setQuestions(data.questions.map((question: Omit<Question, 'answerIndex'>) => ({ ...question, answerIndex: -1 })));
+        setDurationMinutes(data.durationMinutes);
+        setTimeLeft(data.durationMinutes * 60);
       })
       .catch((error: unknown) => {
-        setQuizLoadError(error instanceof Error ? error.message : 'Could not check assessment availability.');
+        setQuizLoadError(error instanceof Error ? error.message : 'Could not load assessment.');
       })
       .finally(() => setQuizLoading(false));
   }, [isBuiltinAssessment, testKey]);
@@ -117,8 +112,6 @@ export default function TestRunner() {
       setSubmitting(true);
       setSubmitError('');
 
-      const { correct, total } = scoreSimple(questions, answers);
-      const percent            = Math.round((correct / total) * 100);
       const testId             = `${testKey.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const submittedAtISO     = new Date().toISOString();
 
@@ -138,6 +131,7 @@ export default function TestRunner() {
       const resultPayload = {
         testKey: testId,
         testType: isCustomQuiz ? 'custom' : testKey,
+        ...(isBuiltinAssessment ? { assessmentAttemptId } : {}),
         ...(customQuiz ? { customQuizId: customQuiz.id, testTitle: customQuiz.title } : {}),
         candidateEmail:  candidateInfo.email    ?? '',
         candidateName:   candidateInfo.fullName ?? '',
@@ -145,7 +139,6 @@ export default function TestRunner() {
         candidateCourse: candidateInfo.course   ?? '',
         candidatePhone:  candidateInfo.phone    ?? '',
         submittedAtISO,
-        score: { correct, total, percent },
         answers,
         autoSubmitted: auto,
       };
@@ -160,18 +153,23 @@ export default function TestRunner() {
         if (!response.ok) {
           throw new Error(responseBody.error || `Submission failed (${response.status}).`);
         }
-        if (isCustomQuiz) {
-          const serverScore = responseBody.score;
-          if (
-            !serverScore
-            || !Number.isInteger(serverScore.correct)
-            || !Number.isInteger(serverScore.total)
-            || !Number.isInteger(serverScore.percent)
-          ) {
-            throw new Error('The API did not return a valid score for this quiz.');
-          }
-          resultPayload.score = serverScore;
+        const serverScore = responseBody.score;
+        if (
+          !serverScore
+          || !Number.isInteger(serverScore.correct)
+          || !Number.isInteger(serverScore.total)
+          || !Number.isInteger(serverScore.percent)
+        ) {
+          throw new Error('The API did not return a valid score for this assessment.');
         }
+        const completedPayload = {
+          ...resultPayload,
+          score: serverScore,
+          ...(responseBody.aptitudeReport ? { aptitudeReport: responseBody.aptitudeReport } : {}),
+        };
+        try {
+          sessionStorage.setItem(`lastResult:${testKey}`, JSON.stringify(completedPayload));
+        } catch { /* ignore */ }
       } catch (e) {
         console.error('Submit error:', e);
         setSubmitError(e instanceof Error ? e.message : 'Could not save your result. Check the local API and retry.');
@@ -179,16 +177,12 @@ export default function TestRunner() {
         return;
       }
 
-      try {
-        sessionStorage.setItem(`lastResult:${testKey}`, JSON.stringify(resultPayload));
-      } catch { /* ignore */ }
-
       if (isCustomQuiz && customQuiz) markCustomQuizCompleted(customQuiz.id);
       else markCompleted(testKey);
       setSubmitted(true);
       navigate(`/results/${testKey}`);
     },
-    [answers, questions, testKey, submitted, submitting, navigate, isCustomQuiz, customQuiz]
+    [answers, testKey, submitted, submitting, navigate, isCustomQuiz, isBuiltinAssessment, assessmentAttemptId, customQuiz]
   );
 
   useEffect(() => {
