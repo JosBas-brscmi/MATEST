@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const port = Number(process.env.PORT || 3001);
-const host = process.env.HOST || '127.0.0.1';
+const host = process.env.HOST || '0.0.0.0';
 const { db, databasePath } = openDatabase();
 const ADMIN_MAX_FAILED_ATTEMPTS = 4;
 const ADMIN_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
