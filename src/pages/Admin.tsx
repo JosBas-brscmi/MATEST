@@ -198,7 +198,7 @@ export default function Admin() {
               </Link>
             </>
           )}
-          <Link to="/portal" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
+          <Link to="/" className="rounded-xl border border-white/15 px-4 py-2 hover:bg-white/5 text-sm">Back</Link>
         </div>
       </div>
 
